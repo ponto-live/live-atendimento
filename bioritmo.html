@@ -89,7 +89,7 @@ function renderFila() {
     let bc='pos-badge ', bt='';
     if(alm){bc+='almoco';bt='🍽️';}else if(casa){bc+='casa';bt='🏠';}else if(atend){bc+='atendendo';bt='●';}else if(isVez){bc+='vez';bt='★';}else{bc+='normal';bt=String(fila.slice(0,i).filter(x=>x.status==='aguarda').length+1);}
     let st='', sc='';
-    if(alm){st='No almoço';sc='s-almoco';}else if(casa){st='Em casa';sc='s-casa';}else if(atend){st='Em atendimento';sc='s-atende';}else if(isVez){st='Na vez ⭐';sc='s-vez';}
+    if(alm){st='No almoço';sc='s-almoco';}else if(casa){st='Em casa';sc='s-casa';}else if(atend){st=v.preferencia?'Em atendimento 💜 preferência':'Em atendimento';sc='s-atende';}else if(isVez){st='Na vez ⭐';sc='s-vez';}
     else{st=(fila.slice(0,i).filter(x=>x.status==='aguarda').length+1)+'ª na fila';sc='s-aguarda';}
     let ac='';
     if(casa){
@@ -101,7 +101,7 @@ function renderFila() {
     }else if(isVez){
       ac=`<button class="btn-a btn-atender" onclick="iniciarAtendimento(${i})">▶ Em atendimento</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else{
-      ac=`<button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
+      ac=`<button class="btn-a btn-pref" onclick="abrirModalPref(${i})">💜 Preferência</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }
     return `<div class="${cc}"><div class="${bc}">${bt}</div><div style="flex:1;min-width:0"><div class="v-nome">${v.nome}</div><div class="v-status ${sc}">${st}</div></div><div class="card-acoes">${ac}</div></div>`;
   }).join('');
@@ -161,7 +161,7 @@ window.confirmar = async function(){
   if(resSel==='saiu'){motivo=(motSel==='Outro')?document.getElementById('input-outro').value.trim():motSel;}
   if(resSel==='troca_c'){diferenca=parseFloat(document.getElementById('input-diferenca').value);}
   atendimentos.push({id:Date.now(),resultado:resSel,motivo:motivo||null,diferenca:diferenca||null,vendedora:nome,hora:hora()});
-  const v=fila.splice(i,1)[0]; v.status='aguarda'; fila.push(v);
+  const v=fila.splice(i,1)[0]; v.status='aguarda'; delete v.preferencia; fila.push(v);
   await salvarFila();
   await salvarAtend();
   fecharModalReg();
@@ -201,7 +201,7 @@ window.excluir = async function(id){
   atendimentos=atendimentos.filter(a=>a.id!==id);
   await salvarAtend();
 }
-function mostrarToast(){const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+function mostrarToast(msg){const t=document.getElementById('toast');t.textContent=msg||'✅ Registrado!';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 // ══ MODAL FECHAR ══
 window.abrirModalFechar = function(){
@@ -269,6 +269,44 @@ window.enviarWpp = function(idx){
   const texto=`📊 *LIVE! ${LOJA_NOME}*\n📅 ${ds} · ⏰ ${hora()}\n\n✅ Vendas: *${vendas}*\n🏆 Vendões: *${vendoes}*\n🔄 Trocas: *${trocas}*\n❌ Sem venda: *${saiu}*\n📈 Conversão: *${conv}%*\n👥 Total: *${total} atendimentos*${mo.length?'\n\n🔍 *Motivos de não-venda:*\n'+mo.map(([m,n])=>`  • ${m}: ${n}x`).join('\n'):''}\n\n_Relatório via LIVE! Atendimento_`;
   window.open('https://wa.me/'+WPP[idx]+'?text='+encodeURIComponent(texto),'_blank');
 }
+
+// ══ PREFERÊNCIA ══
+let prefSolicitante = null;
+
+window.abrirModalPref = function(i) {
+  prefSolicitante = i;
+  // Lista vendedoras disponíveis (não em casa, não a própria)
+  const disponiveis = fila.filter((v, idx) => idx !== i && v.status !== 'casa');
+  if (disponiveis.length === 0) {
+    alert('Nenhuma vendedora disponível para preferência.');
+    return;
+  }
+  const stMap = {aguarda:'Na fila', atendendo:'Em atendimento', almoco:'No almoço'};
+  document.getElementById('pref-solicitante').textContent = fila[i].nome;
+  document.getElementById('pref-grid').innerHTML = disponiveis.map((v, _) => {
+    const idxReal = fila.indexOf(v);
+    return `<button class="btn-pref-vend" onclick="confirmarPref(${idxReal})">
+      <span>👤 ${v.nome}</span>
+      <span class="pv-status">${stMap[v.status]||v.status}</span>
+    </button>`;
+  }).join('');
+  document.getElementById('modal-pref').classList.add('show');
+}
+
+window.confirmarPref = async function(idxEscolhida) {
+  // Marca a vendedora escolhida como atendendo por preferência
+  fila[idxEscolhida].status = 'atendendo';
+  fila[idxEscolhida].preferencia = true;
+  await salvarFila();
+  document.getElementById('modal-pref').classList.remove('show');
+  mostrarToast('💜 Atendimento por preferência iniciado!');
+}
+
+window.fecharModalPref = function() {
+  document.getElementById('modal-pref').classList.remove('show');
+  prefSolicitante = null;
+}
+
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -360,6 +398,13 @@ main{padding:20px;max-width:860px;margin:0 auto}
 .btn-mpdf{flex:1;background:var(--am);color:var(--pr);border:none;border-radius:8px;font-size:12px;font-weight:800;padding:11px;cursor:pointer;font-family:'Inter',sans-serif}.btn-mpdf:hover{opacity:.9}
 .btn-mwpp{flex:1;background:#25D366;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;padding:11px;cursor:pointer;font-family:'Inter',sans-serif}.btn-mwpp:hover{opacity:.9}
 .btn-mwpp2{flex:1;background:#128C7E;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;padding:11px;cursor:pointer;font-family:'Inter',sans-serif}.btn-mwpp2:hover{opacity:.9}
+
+.btn-pref{background:rgba(168,85,247,.15);color:var(--rox);border:1px solid var(--rox)}.btn-pref:hover{background:rgba(168,85,247,.25)}
+.pref-grid{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.btn-pref-vend{border:1px solid var(--cb);background:var(--cm);border-radius:8px;padding:12px 14px;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:#ccc;text-align:left;transition:all .15s;display:flex;align-items:center;gap:10px}
+.btn-pref-vend:hover{border-color:var(--rox);color:var(--rox);background:rgba(168,85,247,.1)}
+.btn-pref-vend .pv-status{font-size:10px;color:#666;margin-left:auto}
+
 #toast{position:fixed;bottom:20px;right:20px;background:var(--vd);color:var(--pr);font-weight:700;font-size:12px;padding:10px 18px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
 #toast.show{opacity:1}
 .live-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:3px 10px;font-size:10px;color:var(--vd);font-weight:700}
@@ -450,6 +495,17 @@ main{padding:20px;max-width:860px;margin:0 auto}
     </div>
     <button class="btn-confirmar" id="btn-confirmar" disabled onclick="confirmar()">Confirmar e voltar para a fila</button>
     <button class="btn-cancel" onclick="fecharModalReg()">Cancelar</button>
+  </div>
+</div>
+
+
+<!-- MODAL PREFERÊNCIA -->
+<div class="modal-overlay" id="modal-pref">
+  <div class="modal">
+    <div class="modal-titulo">💜 Atendimento por Preferência</div>
+    <div class="modal-sub">Cliente solicitado por <span id="pref-solicitante"></span> — escolha a vendedora:</div>
+    <div class="pref-grid" id="pref-grid"></div>
+    <button class="btn-cancel" style="margin-top:14px" onclick="fecharModalPref()">Cancelar</button>
   </div>
 </div>
 
