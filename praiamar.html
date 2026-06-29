@@ -97,7 +97,7 @@ function renderFila() {
     }else if(alm){
       ac=`<button class="btn-a btn-volta" onclick="voltarAlmoco(${i})">✅ Voltei!</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else if(atend){
-      ac=`<button class="btn-a btn-reg" onclick="abrirModalReg(${i})">📝 Registrar</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
+      ac=`<button class="btn-a btn-reg" onclick="abrirModalReg(${i})">📝 Registrar</button><button class="btn-a btn-pref" onclick="abrirModalPref(${i})">💜 Preferência</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else if(isVez){
       ac=`<button class="btn-a btn-atender" onclick="iniciarAtendimento(${i})">▶ Em atendimento</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else{
