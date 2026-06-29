@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIVE! Painel Geral — Atendimento</title>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB-zKf7IAf53j2nRj3H9jGCUhM6bft-xsg",
+  authDomain: "live-atendimento.firebaseapp.com",
+  databaseURL: "https://live-atendimento-default-rtdb.firebaseio.com",
+  projectId: "live-atendimento",
+  storageBucket: "live-atendimento.firebasestorage.app",
+  messagingSenderId: "776732685372",
+  appId: "1:776732685372:web:51649de3a57162166bff39"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+const LOJAS = [
+  {id:'praiamar',    nome:'Praiamar',    link:'praiamar.html'},
+  {id:'miramar',     nome:'Miramar',     link:'miramar.html'},
+  {id:'azevedo',     nome:'Azevedo',     link:'azevedo.html'},
+  {id:'praiagrande', nome:'Praia Grande',link:'praiagrande.html'},
+  {id:'bioritmo',    nome:'Bioritmo',    link:'bioritmo.html'},
+];
+
+const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+const dadosLojas = {};
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('header-data').textContent =
+    new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+  LOJAS.forEach(l => {
+    dadosLojas[l.id] = {fila:[], atend:[]};
+
+    onValue(ref(db, `lojas/${l.id}/fila`), snap => {
+      dadosLojas[l.id].fila = snap.val() ? Object.values(snap.val()) : [];
+      renderTudo();
+    });
+    onValue(ref(db, `lojas/${l.id}/atendimentos/${hoje}`), snap => {
+      dadosLojas[l.id].atend = snap.val() ? Object.values(snap.val()) : [];
+      renderTudo();
+    });
+  });
+});
+
+function renderTudo() {
+  // Totalizador geral
+  let gTotal=0, gVendas=0, gVendoes=0, gTrocas=0, gSaiu=0;
+  LOJAS.forEach(l => {
+    const a = dadosLojas[l.id].atend;
+    gTotal   += a.length;
+    gVendas  += a.filter(x=>x.resultado==='venda').length;
+    gVendoes += a.filter(x=>x.resultado==='vendao').length;
+    gTrocas  += a.filter(x=>x.resultado==='troca_s'||x.resultado==='troca_c').length;
+    gSaiu    += a.filter(x=>x.resultado==='saiu').length;
+  });
+  const gConv = gTotal>0 ? Math.round(((gVendas+gVendoes)/gTotal)*100) : 0;
+  document.getElementById('g-total').textContent=gTotal;
+  document.getElementById('g-vendas').textContent=gVendas;
+  document.getElementById('g-vendoes').textContent=gVendoes;
+  document.getElementById('g-trocas').textContent=gTrocas;
+  document.getElementById('g-saiu').textContent=gSaiu;
+  document.getElementById('g-conv').textContent=gTotal>0?gConv+'%':'—';
+  document.getElementById('bar-g').style.width=gConv+'%';
+
+  // Cards por loja
+  const grid = document.getElementById('lojas-grid');
+  grid.innerHTML = LOJAS.map(l => {
+    const fila  = dadosLojas[l.id].fila;
+    const atend = dadosLojas[l.id].atend;
+    const total  = atend.length;
+    const vendas = atend.filter(a=>a.resultado==='venda').length;
+    const vendoes= atend.filter(a=>a.resultado==='vendao').length;
+    const trocas = atend.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
+    const saiu   = atend.filter(a=>a.resultado==='saiu').length;
+    const conv   = total>0?Math.round(((vendas+vendoes)/total)*100):0;
+    const naVez  = fila.find(v=>v.status==='aguarda');
+    const atendendo = fila.filter(v=>v.status==='atendendo').map(v=>v.nome);
+    const almoco    = fila.filter(v=>v.status==='almoco').map(v=>v.nome);
+    const casa      = fila.filter(v=>v.status==='casa').map(v=>v.nome);
+
+    return `
+    <div class="loja-card">
+      <div class="loja-header">
+        <div>
+          <div class="loja-nome">${l.nome}</div>
+          <div class="loja-conv">${total>0?conv+'% conversão':'Sem registros ainda'}</div>
+        </div>
+        <a href="${l.link}" class="btn-acessar">Abrir →</a>
+      </div>
+
+      <div class="loja-nums">
+        <div class="loja-num-item"><span class="loja-num" style="color:#22C55E">${vendas}</span><span class="loja-num-l">Vendas</span></div>
+        <div class="loja-num-item"><span class="loja-num" style="color:#FFD700">${vendoes}</span><span class="loja-num-l">Vendões</span></div>
+        <div class="loja-num-item"><span class="loja-num" style="color:#3B82F6">${trocas}</span><span class="loja-num-l">Trocas</span></div>
+        <div class="loja-num-item"><span class="loja-num" style="color:#EF4444">${saiu}</span><span class="loja-num-l">Sem venda</span></div>
+        <div class="loja-num-item"><span class="loja-num" style="color:#F5C800">${total}</span><span class="loja-num-l">Total</span></div>
+      </div>
+
+      <div class="bar-out" style="margin:10px 0"><div class="bar-in" style="width:${conv}%"></div></div>
+
+      <div class="fila-mini">
+        ${naVez ? `<div class="fila-mini-item vez">⭐ Na vez: <strong>${naVez.nome}</strong></div>` : '<div class="fila-mini-item vazia">Nenhuma na vez</div>'}
+        ${atendendo.length ? `<div class="fila-mini-item atend">● Atendendo: ${atendendo.join(', ')}</div>` : ''}
+        ${almoco.length    ? `<div class="fila-mini-item alm">🍽️ Almoço: ${almoco.join(', ')}</div>` : ''}
+        ${casa.length      ? `<div class="fila-mini-item casa">🏠 Casa: ${casa.join(', ')}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--am:#F5C800;--pr:#0A0A0A;--ce:#1A1A1A;--cm:#2A2A2A;--cb:#333;--br:#FFF;--vd:#22C55E;--vm:#EF4444;--az:#3B82F6;}
+body{font-family:'Inter',sans-serif;background:var(--pr);color:var(--br);min-height:100vh}
+header{background:var(--ce);border-bottom:2px solid var(--am);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:22px;font-weight:900}.logo span{color:var(--am)}
+.painel-tag{background:var(--am);color:var(--pr);font-size:10px;font-weight:800;padding:3px 9px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px}
+.live-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:3px 10px;font-size:10px;color:var(--vd);font-weight:700}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--vd);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+main{padding:24px;max-width:1100px;margin:0 auto}
+.section-title{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+
+/* TOTALIZADOR */
+.total-card{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:20px;margin-bottom:28px}
+.total-titulo{font-size:13px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+.total-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+.total-item{text-align:center}
+.total-num{font-size:28px;font-weight:900;line-height:1;margin-bottom:3px}
+.total-lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.bar-out{background:#222;border-radius:6px;height:8px;overflow:hidden}
+.bar-in{height:100%;background:linear-gradient(90deg,var(--am),#FFD700);border-radius:6px;transition:width .5s}
+
+/* GRID LOJAS */
+.lojas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.loja-card{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:18px;transition:border-color .2s}
+.loja-card:hover{border-color:#555}
+.loja-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.loja-nome{font-size:16px;font-weight:800}
+.loja-conv{font-size:11px;color:#888;margin-top:2px}
+.btn-acessar{background:var(--am);color:var(--pr);border:none;border-radius:6px;font-size:11px;font-weight:800;padding:6px 12px;cursor:pointer;text-decoration:none;white-space:nowrap;font-family:'Inter',sans-serif}
+.btn-acessar:hover{opacity:.85}
+.loja-nums{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:4px}
+.loja-num-item{text-align:center}
+.loja-num{font-size:20px;font-weight:900;display:block;line-height:1.1}
+.loja-num-l{font-size:8px;color:#666;text-transform:uppercase;letter-spacing:.3px;display:block;margin-top:2px}
+.fila-mini{display:flex;flex-direction:column;gap:4px;margin-top:10px;padding-top:10px;border-top:1px solid #222}
+.fila-mini-item{font-size:11px;padding:4px 8px;border-radius:4px}
+.fila-mini-item.vez{color:var(--am);background:rgba(245,200,0,.08)}
+.fila-mini-item.atend{color:var(--vd);background:rgba(34,197,94,.08)}
+.fila-mini-item.alm{color:#aaa;background:rgba(255,255,255,.04)}
+.fila-mini-item.casa{color:#666;background:rgba(255,255,255,.02)}
+.fila-mini-item.vazia{color:#444}
+@media(max-width:600px){.total-grid{grid-template-columns:repeat(3,1fr)}.lojas-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="logo">LIVE<span>!</span></div>
+    <div class="painel-tag">Painel Geral</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="live-badge"><span class="live-dot"></span>Ao vivo</div>
+    <span style="font-size:11px;color:#666" id="header-data"></span>
+  </div>
+</header>
+<main>
+  <div style="margin-bottom:24px"></div>
+
+  <!-- TOTALIZADOR -->
+  <div class="total-card">
+    <div class="total-titulo">📊 Consolidado — Todas as lojas</div>
+    <div class="total-grid">
+      <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-total">—</div><div class="total-lbl">Total</div></div>
+      <div class="total-item"><div class="total-num" style="color:var(--vd)" id="g-vendas">—</div><div class="total-lbl">Vendas</div></div>
+      <div class="total-item"><div class="total-num" style="color:#FFD700"   id="g-vendoes">—</div><div class="total-lbl">Vendões</div></div>
+      <div class="total-item"><div class="total-num" style="color:var(--az)" id="g-trocas">—</div><div class="total-lbl">Trocas</div></div>
+      <div class="total-item"><div class="total-num" style="color:var(--vm)" id="g-saiu">—</div><div class="total-lbl">Sem venda</div></div>
+      <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-conv">—</div><div class="total-lbl">Conversão</div></div>
+    </div>
+    <div class="bar-out"><div class="bar-in" id="bar-g" style="width:0%"></div></div>
+  </div>
+
+  <!-- LOJAS -->
+  <div class="section-title">Lojas — situação em tempo real</div>
+  <div class="lojas-grid" id="lojas-grid">
+    <div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div>
+  </div>
+</main>
+</body>
+</html>
