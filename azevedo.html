@@ -275,19 +275,22 @@ let prefSolicitante = null;
 
 window.abrirModalPref = function(i) {
   prefSolicitante = i;
-  // Lista vendedoras disponíveis (não em casa, não a própria)
-  const disponiveis = fila.filter((v, idx) => idx !== i && v.status !== 'casa');
+  // Lista TODAS as vendedoras exceto quem está em casa e a própria
+  const disponiveis = fila.filter((v, idx) => v.status !== 'casa');
   if (disponiveis.length === 0) {
     alert('Nenhuma vendedora disponível para preferência.');
     return;
   }
   const stMap = {aguarda:'Na fila', atendendo:'Em atendimento', almoco:'No almoço'};
+  const vezIdx = fila.findIndex(v => v.status === 'aguarda');
   document.getElementById('pref-solicitante').textContent = fila[i].nome;
   document.getElementById('pref-grid').innerHTML = disponiveis.map((v, _) => {
     const idxReal = fila.indexOf(v);
+    const isVezAtual = (idxReal === vezIdx);
+    const statusLabel = isVezAtual ? 'Na vez ⭐' : (stMap[v.status] || v.status);
     return `<button class="btn-pref-vend" onclick="confirmarPref(${idxReal})">
       <span>👤 ${v.nome}</span>
-      <span class="pv-status">${stMap[v.status]||v.status}</span>
+      <span class="pv-status">${statusLabel}</span>
     </button>`;
   }).join('');
   document.getElementById('modal-pref').classList.add('show');
