@@ -112,18 +112,32 @@ function renderTudo() {
 }
 
 // ══════════════════ ANÁLISE MENSAL ══════════════════
+const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
 function popularSeletorMes() {
   const sel = document.getElementById('sel-mes');
-  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const agora = new Date();
-  let opts = '';
-  for (let i = 0; i < 6; i++) {
+  let opts = '<option value="ano-atual">📅 Ano todo — ' + agora.getFullYear() + '</option>';
+  opts += '<option value="ano-anterior">📅 Ano todo — ' + (agora.getFullYear()-1) + '</option>';
+  opts += '<optgroup label="Meses individuais">';
+  for (let i = 0; i < 24; i++) {
     const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
     const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    opts += `<option value="${val}">${meses[d.getMonth()]} de ${d.getFullYear()}</option>`;
+    opts += `<option value="${val}">${MESES_NOMES[d.getMonth()]} de ${d.getFullYear()}</option>`;
   }
+  opts += '</optgroup>';
   sel.innerHTML = opts;
   sel.value = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
+
+  // Popular seletor de comparação (mesmo mês, ano anterior)
+  const selComp = document.getElementById('sel-mes-comparar');
+  let optsComp = '<option value="">Nenhuma (ver só 1 período)</option>';
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    optsComp += `<option value="${val}">vs ${MESES_NOMES[d.getMonth()]} de ${d.getFullYear()}</option>`;
+  }
+  selComp.innerHTML = optsComp;
 }
 
 window.trocarTabPrincipal = function(t) {
@@ -132,34 +146,103 @@ window.trocarTabPrincipal = function(t) {
   document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
 }
 
+async function buscarAtendimentosPeriodo(selValor, lojasParaBuscar) {
+  let todosAtendimentos = [];
+  let mesesParaBuscar = [];
+
+  if (selValor === 'ano-atual') {
+    const ano = new Date().getFullYear();
+    for (let m = 1; m <= 12; m++) mesesParaBuscar.push({ano, mes:m});
+  } else if (selValor === 'ano-anterior') {
+    const ano = new Date().getFullYear() - 1;
+    for (let m = 1; m <= 12; m++) mesesParaBuscar.push({ano, mes:m});
+  } else {
+    const [ano, mes] = selValor.split('-').map(Number);
+    mesesParaBuscar.push({ano, mes});
+  }
+
+  for (const {ano, mes} of mesesParaBuscar) {
+    const diasNoMes = new Date(ano, mes, 0).getDate();
+    for (const lojaId of lojasParaBuscar) {
+      for (let dia = 1; dia <= diasNoMes; dia++) {
+        const dataStr = `${String(dia).padStart(2,'0')}-${String(mes).padStart(2,'0')}-${ano}`;
+        try {
+          const snap = await get(ref(db, `lojas/${lojaId}/atendimentos/${dataStr}`));
+          if (snap.exists()) {
+            const vals = Object.values(snap.val());
+            vals.forEach(v => v._loja = lojaId);
+            todosAtendimentos = todosAtendimentos.concat(vals);
+          }
+        } catch(e) {}
+      }
+    }
+  }
+  return todosAtendimentos;
+}
+
 window.carregarAnaliseMensal = async function() {
-  const selMes = document.getElementById('sel-mes').value; // formato YYYY-MM
-  const selLoja = document.getElementById('sel-loja-analise').value; // 'todas' ou id da loja
-  const [ano, mes] = selMes.split('-').map(Number);
-  const diasNoMes = new Date(ano, mes, 0).getDate();
+  const selMes = document.getElementById('sel-mes').value;
+  const selComparar = document.getElementById('sel-mes-comparar').value;
+  const selLoja = document.getElementById('sel-loja-analise').value;
 
   document.getElementById('analise-loading').style.display = 'block';
   document.getElementById('analise-conteudo').style.display = 'none';
+  document.getElementById('analise-comparativo').style.display = 'none';
 
   const lojasParaBuscar = selLoja === 'todas' ? LOJAS.map(l=>l.id) : [selLoja];
 
-  let todosAtendimentos = [];
+  const atendimentosPrincipal = await buscarAtendimentosPeriodo(selMes, lojasParaBuscar);
+  renderAnaliseMensal(atendimentosPrincipal, selMes);
 
-  for (const lojaId of lojasParaBuscar) {
-    for (let dia = 1; dia <= diasNoMes; dia++) {
-      const dataStr = `${String(dia).padStart(2,'0')}-${String(mes).padStart(2,'0')}-${ano}`;
-      try {
-        const snap = await get(ref(db, `lojas/${lojaId}/atendimentos/${dataStr}`));
-        if (snap.exists()) {
-          const vals = Object.values(snap.val());
-          vals.forEach(v => v._loja = lojaId);
-          todosAtendimentos = todosAtendimentos.concat(vals);
-        }
-      } catch(e) {}
-    }
+  if (selComparar) {
+    const atendimentosComparar = await buscarAtendimentosPeriodo(selComparar, lojasParaBuscar);
+    renderComparativo(atendimentosPrincipal, atendimentosComparar, selMes, selComparar);
   }
+}
 
-  renderAnaliseMensal(todosAtendimentos, selMes);
+function labelPeriodo(valor) {
+  if (valor === 'ano-atual') return 'Ano ' + new Date().getFullYear();
+  if (valor === 'ano-anterior') return 'Ano ' + (new Date().getFullYear()-1);
+  const [ano, mes] = valor.split('-').map(Number);
+  return MESES_NOMES[mes-1] + '/' + ano;
+}
+
+function renderComparativo(periodoA, periodoB, valA, valB) {
+  document.getElementById('analise-comparativo').style.display = 'block';
+
+  const totalA = periodoA.length, totalB = periodoB.length;
+  const vendasA = periodoA.filter(a=>a.resultado==='venda'||a.resultado==='vendao').length;
+  const vendasB = periodoB.filter(a=>a.resultado==='venda'||a.resultado==='vendao').length;
+  const convA = totalA>0?Math.round((vendasA/totalA)*100):0;
+  const convB = totalB>0?Math.round((vendasB/totalB)*100):0;
+  const saiuA = periodoA.filter(a=>a.resultado==='saiu').length;
+  const saiuB = periodoB.filter(a=>a.resultado==='saiu').length;
+
+  document.getElementById('comp-label-a').textContent = labelPeriodo(valA);
+  document.getElementById('comp-label-b').textContent = labelPeriodo(valB);
+  document.getElementById('comp-total-a').textContent = totalA;
+  document.getElementById('comp-total-b').textContent = totalB;
+  document.getElementById('comp-conv-a').textContent = totalA>0?convA+'%':'—';
+  document.getElementById('comp-conv-b').textContent = totalB>0?convB+'%':'—';
+  document.getElementById('comp-saiu-a').textContent = saiuA;
+  document.getElementById('comp-saiu-b').textContent = saiuB;
+
+  // Categorias comparativas
+  const catA = {}, catB = {};
+  periodoA.filter(a=>a.resultado==='saiu'&&a.categoria).forEach(a=>catA[a.categoria]=(catA[a.categoria]||0)+1);
+  periodoB.filter(a=>a.resultado==='saiu'&&a.categoria).forEach(a=>catB[a.categoria]=(catB[a.categoria]||0)+1);
+  const todasCats = [...new Set([...Object.keys(catA), ...Object.keys(catB)])];
+  const maxCatComp = Math.max(1, ...todasCats.map(c => Math.max(catA[c]||0, catB[c]||0)));
+
+  document.getElementById('comp-categorias').innerHTML = todasCats.length ? todasCats.map(c => `
+    <div class="comp-cat-row">
+      <div class="comp-cat-label">${c}</div>
+      <div class="comp-cat-bars">
+        <div class="comp-cat-bar-wrap"><div class="comp-cat-bar a" style="width:${((catA[c]||0)/maxCatComp*100)}%"></div><span>${catA[c]||0}</span></div>
+        <div class="comp-cat-bar-wrap"><div class="comp-cat-bar b" style="width:${((catB[c]||0)/maxCatComp*100)}%"></div><span>${catB[c]||0}</span></div>
+      </div>
+    </div>
+  `).join('') : '<div class="empty-state" style="padding:16px"><div class="big">🏷️</div>Sem categorias suficientes para comparar.</div>';
 }
 
 function renderAnaliseMensal(atendimentos, selMes) {
@@ -293,6 +376,24 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .empty-state{text-align:center;color:#555;font-size:13px}
 .empty-state .big{font-size:32px;margin-bottom:6px}
 #analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
+.comp-header{display:flex;gap:20px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #222}
+.comp-header-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#ddd}
+.comp-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.comp-dot.a{background:var(--am)}.comp-dot.b{background:var(--rox)}
+.comp-resumo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px}
+.comp-resumo-card{background:var(--cm);border-radius:10px;padding:14px;text-align:center}
+.comp-resumo-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.comp-resumo-vals{display:flex;align-items:center;justify-content:center;gap:8px}
+.comp-resumo-vals .va{font-size:20px;font-weight:900;color:var(--am)}
+.comp-resumo-vals .vb{font-size:20px;font-weight:900;color:var(--rox)}
+.comp-resumo-vals .vs{font-size:10px;color:#555}
+.comp-cat-row{margin-bottom:14px}
+.comp-cat-label{font-size:12px;color:#ccc;margin-bottom:6px;font-weight:600}
+.comp-cat-bars{display:flex;flex-direction:column;gap:4px}
+.comp-cat-bar-wrap{display:flex;align-items:center;gap:8px}
+.comp-cat-bar-wrap span{font-size:11px;font-weight:700;color:#aaa;width:24px;text-align:right;flex-shrink:0}
+.comp-cat-bar{height:14px;border-radius:4px;background:var(--am);min-width:2px;transition:width .4s}
+.comp-cat-bar.b{background:var(--rox)}
 
 @media(max-width:600px){
   .total-grid{grid-template-columns:repeat(3,1fr)}
@@ -344,6 +445,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
     <div style="margin-bottom:24px"></div>
     <div class="am-filtros">
       <select class="am-select" id="sel-mes"></select>
+      <select class="am-select" id="sel-mes-comparar"></select>
       <select class="am-select" id="sel-loja-analise">
         <option value="todas">Todas as lojas</option>
         <option value="praiamar">Praiamar</option>
@@ -375,6 +477,30 @@ main{padding:24px;max-width:1100px;margin:0 auto}
       </div>
 
       <div class="am-insight" id="am-insight"></div>
+
+      <div class="am-bloco" id="analise-comparativo" style="display:none;border-color:rgba(168,85,247,.3)">
+        <div class="am-bloco-titulo" style="color:var(--rox)">📊 Comparativo entre períodos</div>
+        <div class="comp-header">
+          <div class="comp-header-item a"><span class="comp-dot a"></span><span id="comp-label-a">—</span></div>
+          <div class="comp-header-item b"><span class="comp-dot b"></span><span id="comp-label-b">—</span></div>
+        </div>
+        <div class="comp-resumo-grid">
+          <div class="comp-resumo-card">
+            <div class="comp-resumo-lbl">Total de atendimentos</div>
+            <div class="comp-resumo-vals"><span class="va" id="comp-total-a">0</span><span class="vs">vs</span><span class="vb" id="comp-total-b">0</span></div>
+          </div>
+          <div class="comp-resumo-card">
+            <div class="comp-resumo-lbl">Conversão</div>
+            <div class="comp-resumo-vals"><span class="va" id="comp-conv-a">—</span><span class="vs">vs</span><span class="vb" id="comp-conv-b">—</span></div>
+          </div>
+          <div class="comp-resumo-card">
+            <div class="comp-resumo-lbl">Sem venda</div>
+            <div class="comp-resumo-vals"><span class="va" id="comp-saiu-a">0</span><span class="vs">vs</span><span class="vb" id="comp-saiu-b">0</span></div>
+          </div>
+        </div>
+        <div class="am-bloco-titulo" style="margin-top:18px;color:var(--rox)">🏷️ Categorias perdidas — comparativo</div>
+        <div id="comp-categorias"></div>
+      </div>
     </div>
 
     <div style="color:#555;font-size:12px;text-align:center;margin-top:16px" id="analise-hint">
