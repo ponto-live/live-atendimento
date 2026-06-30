@@ -122,8 +122,10 @@ window.abrirModalReg = function(i) {
   document.getElementById('bloco-motivos').style.display='none';
   document.getElementById('bloco-diferenca').style.display='none';
   document.getElementById('bloco-outro').style.display='none';
+  document.getElementById('bloco-categoria').style.display='none';
   document.getElementById('input-outro').value='';
   document.getElementById('input-diferenca').value='';
+  document.getElementById('select-categoria').value='';
   document.getElementById('btn-confirmar').disabled=true;
   document.getElementById('modal-reg').classList.add('show');
 }
@@ -134,8 +136,10 @@ window.selRes = function(tipo){
   document.querySelectorAll('.btn-res').forEach(b=>b.className='btn-res');
   document.querySelectorAll('.btn-mot').forEach(b=>b.classList.remove('ativo'));
   document.getElementById('bloco-outro').style.display='none';
+  document.getElementById('bloco-categoria').style.display='none';
   document.getElementById('input-outro').value='';
   document.getElementById('input-diferenca').value='';
+  document.getElementById('select-categoria').value='';
   const mapa={venda:'av',vendao:'avip',troca_s:'at',troca_c:'at',saiu:'as'};
   document.getElementById('br-'+tipo).classList.add(mapa[tipo]);
   document.getElementById('bloco-motivos').style.display=(tipo==='saiu')?'block':'none';
@@ -147,20 +151,34 @@ window.selMot = function(btn,mot){
   btn.classList.add('ativo'); motSel=mot;
   document.getElementById('bloco-outro').style.display=(mot==='Outro')?'block':'none';
   if(mot!=='Outro') document.getElementById('input-outro').value='';
+  const motivosComCategoria = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+  document.getElementById('bloco-categoria').style.display = motivosComCategoria.includes(mot) ? 'block' : 'none';
+  if (!motivosComCategoria.includes(mot)) document.getElementById('select-categoria').value='';
   atualizaBtn();
 }
 window.atualizaBtn = function(){
   let ok=!!resSel;
-  if(resSel==='saiu'){ok=!!motSel;if(motSel==='Outro')ok=document.getElementById('input-outro').value.trim().length>0;}
+  if(resSel==='saiu'){
+    ok=!!motSel;
+    if(motSel==='Outro')ok=document.getElementById('input-outro').value.trim().length>0;
+    const motivosComCategoria = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+    if(ok && motivosComCategoria.includes(motSel)){
+      ok = document.getElementById('select-categoria').value !== '';
+    }
+  }
   if(resSel==='troca_c'){ok=document.getElementById('input-diferenca').value.trim().length>0&&parseFloat(document.getElementById('input-diferenca').value)>=0;}
   document.getElementById('btn-confirmar').disabled=!ok;
 }
 window.confirmar = async function(){
   const i=vReg, nome=fila[i].nome;
-  let motivo=null, diferenca=null;
-  if(resSel==='saiu'){motivo=(motSel==='Outro')?document.getElementById('input-outro').value.trim():motSel;}
+  let motivo=null, diferenca=null, categoria=null;
+  if(resSel==='saiu'){
+    motivo=(motSel==='Outro')?document.getElementById('input-outro').value.trim():motSel;
+    const motivosComCategoria = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+    if(motivosComCategoria.includes(motSel)) categoria = document.getElementById('select-categoria').value;
+  }
   if(resSel==='troca_c'){diferenca=parseFloat(document.getElementById('input-diferenca').value);}
-  atendimentos.push({id:Date.now(),resultado:resSel,motivo:motivo||null,diferenca:diferenca||null,vendedora:nome,hora:hora()});
+  atendimentos.push({id:Date.now(),resultado:resSel,motivo:motivo||null,categoria:categoria||null,diferenca:diferenca||null,vendedora:nome,hora:hora()});
   const v=fila.splice(i,1)[0]; v.status='aguarda'; delete v.preferencia; fila.push(v);
   await salvarFila();
   await salvarAtend();
@@ -495,6 +513,27 @@ main{padding:20px;max-width:860px;margin:0 auto}
         <button class="btn-mot" onclick="selMot(this,'Outro')">✏️ Outro...</button>
       </div>
       <div id="bloco-outro"><input class="input-outro" id="input-outro" type="text" placeholder="Descreva o motivo..." oninput="atualizaBtn()"></div>
+      <div id="bloco-categoria" style="display:none;margin-top:12px">
+        <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Qual categoria de produto?</div>
+        <select class="input-outro" id="select-categoria" onchange="atualizaBtn()" style="cursor:pointer">
+          <option value="">Selecione a categoria...</option>
+          <option>Bermuda</option>
+          <option>Calça/Flare</option>
+          <option>Shorts</option>
+          <option>Camiseta/Camisa/Blusa</option>
+          <option>Regata</option>
+          <option>Top</option>
+          <option>Body</option>
+          <option>Blusão/Jaqueta/Parka</option>
+          <option>Fuso/Legging</option>
+          <option>Macacão/Macacinho</option>
+          <option>Saia</option>
+          <option>Vestido</option>
+          <option>Conjunto/Cardigan</option>
+          <option>Acessório</option>
+          <option>Beach</option>
+        </select>
+      </div>
     </div>
     <button class="btn-confirmar" id="btn-confirmar" disabled onclick="confirmar()">Confirmar e voltar para a fila</button>
     <button class="btn-cancel" onclick="fecharModalReg()">Cancelar</button>

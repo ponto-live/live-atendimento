@@ -6,7 +6,7 @@
 <title>LIVE! Painel Geral — Atendimento</title>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB-zKf7IAf53j2nRj3H9jGCUhM6bft-xsg",
@@ -31,6 +31,8 @@ const LOJAS = [
 
 const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
 const dadosLojas = {};
+window._dadosLojas = dadosLojas;
+window._LOJAS = LOJAS;
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-data').textContent =
@@ -38,7 +40,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   LOJAS.forEach(l => {
     dadosLojas[l.id] = {fila:[], atend:[]};
-
     onValue(ref(db, `lojas/${l.id}/fila`), snap => {
       dadosLojas[l.id].fila = snap.val() ? Object.values(snap.val()) : [];
       renderTudo();
@@ -48,10 +49,12 @@ window.addEventListener('DOMContentLoaded', () => {
       renderTudo();
     });
   });
+
+  // Popular seletor de mês
+  popularSeletorMes();
 });
 
 function renderTudo() {
-  // Totalizador geral
   let gTotal=0, gVendas=0, gVendoes=0, gTrocas=0, gSaiu=0;
   LOJAS.forEach(l => {
     const a = dadosLojas[l.id].atend;
@@ -70,7 +73,6 @@ function renderTudo() {
   document.getElementById('g-conv').textContent=gTotal>0?gConv+'%':'—';
   document.getElementById('bar-g').style.width=gConv+'%';
 
-  // Cards por loja
   const grid = document.getElementById('lojas-grid');
   grid.innerHTML = LOJAS.map(l => {
     const fila  = dadosLojas[l.id].fila;
@@ -85,17 +87,12 @@ function renderTudo() {
     const atendendo = fila.filter(v=>v.status==='atendendo').map(v=>v.nome);
     const almoco    = fila.filter(v=>v.status==='almoco').map(v=>v.nome);
     const casa      = fila.filter(v=>v.status==='casa').map(v=>v.nome);
-
     return `
     <div class="loja-card">
       <div class="loja-header">
-        <div>
-          <div class="loja-nome">${l.nome}</div>
-          <div class="loja-conv">${total>0?conv+'% conversão':'Sem registros ainda'}</div>
-        </div>
+        <div><div class="loja-nome">${l.nome}</div><div class="loja-conv">${total>0?conv+'% conversão':'Sem registros ainda'}</div></div>
         <a href="${l.link}" class="btn-acessar">Abrir →</a>
       </div>
-
       <div class="loja-nums">
         <div class="loja-num-item"><span class="loja-num" style="color:#22C55E">${vendas}</span><span class="loja-num-l">Vendas</span></div>
         <div class="loja-num-item"><span class="loja-num" style="color:#FFD700">${vendoes}</span><span class="loja-num-l">Vendões</span></div>
@@ -103,9 +100,7 @@ function renderTudo() {
         <div class="loja-num-item"><span class="loja-num" style="color:#EF4444">${saiu}</span><span class="loja-num-l">Sem venda</span></div>
         <div class="loja-num-item"><span class="loja-num" style="color:#F5C800">${total}</span><span class="loja-num-l">Total</span></div>
       </div>
-
       <div class="bar-out" style="margin:10px 0"><div class="bar-in" style="width:${conv}%"></div></div>
-
       <div class="fila-mini">
         ${naVez ? `<div class="fila-mini-item vez">⭐ Na vez: <strong>${naVez.nome}</strong></div>` : '<div class="fila-mini-item vazia">Nenhuma na vez</div>'}
         ${atendendo.length ? `<div class="fila-mini-item atend">● Atendendo: ${atendendo.join(', ')}</div>` : ''}
@@ -115,11 +110,121 @@ function renderTudo() {
     </div>`;
   }).join('');
 }
+
+// ══════════════════ ANÁLISE MENSAL ══════════════════
+function popularSeletorMes() {
+  const sel = document.getElementById('sel-mes');
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const agora = new Date();
+  let opts = '';
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    opts += `<option value="${val}">${meses[d.getMonth()]} de ${d.getFullYear()}</option>`;
+  }
+  sel.innerHTML = opts;
+  sel.value = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
+}
+
+window.trocarTabPrincipal = function(t) {
+  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='analise')));
+  document.getElementById('view-hoje').style.display = t==='hoje' ? 'block':'none';
+  document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
+}
+
+window.carregarAnaliseMensal = async function() {
+  const selMes = document.getElementById('sel-mes').value; // formato YYYY-MM
+  const selLoja = document.getElementById('sel-loja-analise').value; // 'todas' ou id da loja
+  const [ano, mes] = selMes.split('-').map(Number);
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+
+  document.getElementById('analise-loading').style.display = 'block';
+  document.getElementById('analise-conteudo').style.display = 'none';
+
+  const lojasParaBuscar = selLoja === 'todas' ? LOJAS.map(l=>l.id) : [selLoja];
+
+  let todosAtendimentos = [];
+
+  for (const lojaId of lojasParaBuscar) {
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${String(dia).padStart(2,'0')}-${String(mes).padStart(2,'0')}-${ano}`;
+      try {
+        const snap = await get(ref(db, `lojas/${lojaId}/atendimentos/${dataStr}`));
+        if (snap.exists()) {
+          const vals = Object.values(snap.val());
+          vals.forEach(v => v._loja = lojaId);
+          todosAtendimentos = todosAtendimentos.concat(vals);
+        }
+      } catch(e) {}
+    }
+  }
+
+  renderAnaliseMensal(todosAtendimentos, selMes);
+}
+
+function renderAnaliseMensal(atendimentos, selMes) {
+  document.getElementById('analise-loading').style.display = 'none';
+  document.getElementById('analise-conteudo').style.display = 'block';
+
+  const saiu = atendimentos.filter(a => a.resultado === 'saiu');
+  const total = atendimentos.length;
+  const vendas = atendimentos.filter(a=>a.resultado==='venda').length;
+  const vendoes = atendimentos.filter(a=>a.resultado==='vendao').length;
+  const conv = total>0 ? Math.round(((vendas+vendoes)/total)*100) : 0;
+
+  document.getElementById('am-total').textContent = total;
+  document.getElementById('am-saiu').textContent = saiu.length;
+  document.getElementById('am-conv').textContent = total>0 ? conv+'%' : '—';
+
+  // Motivos
+  const motivos = {};
+  saiu.forEach(a => { if(a.motivo) motivos[a.motivo] = (motivos[a.motivo]||0)+1; });
+  const motivosOrd = Object.entries(motivos).sort((a,b)=>b[1]-a[1]);
+  const maxMotivo = motivosOrd.length ? motivosOrd[0][1] : 1;
+
+  document.getElementById('am-motivos').innerHTML = motivosOrd.length ? motivosOrd.map(([m,n]) => `
+    <div class="am-bar-row">
+      <div class="am-bar-label">${m}</div>
+      <div class="am-bar-track"><div class="am-bar-fill" style="width:${(n/maxMotivo*100)}%"></div></div>
+      <div class="am-bar-num">${n}</div>
+    </div>
+  `).join('') : '<div class="empty-state" style="padding:20px"><div class="big">📋</div>Nenhum registro de não-venda nesse período.</div>';
+
+  // Categorias
+  const categorias = {};
+  saiu.forEach(a => { if(a.categoria) categorias[a.categoria] = (categorias[a.categoria]||0)+1; });
+  const catOrd = Object.entries(categorias).sort((a,b)=>b[1]-a[1]);
+  const maxCat = catOrd.length ? catOrd[0][1] : 1;
+
+  document.getElementById('am-categorias').innerHTML = catOrd.length ? catOrd.map(([c,n]) => `
+    <div class="am-bar-row">
+      <div class="am-bar-label">${c}</div>
+      <div class="am-bar-track"><div class="am-bar-fill cat" style="width:${(n/maxCat*100)}%"></div></div>
+      <div class="am-bar-num">${n}</div>
+    </div>
+  `).join('') : '<div class="empty-state" style="padding:20px"><div class="big">🏷️</div>Nenhuma categoria registrada nesse período.</div>';
+
+  // Cruzamento: categoria mais "perdida" por motivo "não tinha na loja" — destaque pra compras
+  const semEstoque = saiu.filter(a => a.motivo === 'Produto não tinha na loja' && a.categoria);
+  const faltaEstoque = {};
+  semEstoque.forEach(a => { faltaEstoque[a.categoria] = (faltaEstoque[a.categoria]||0)+1; });
+  const faltaOrd = Object.entries(faltaEstoque).sort((a,b)=>b[1]-a[1]);
+
+  document.getElementById('am-insight').innerHTML = faltaOrd.length ? `
+    <div class="am-insight-title">💡 Insight para próximas compras</div>
+    <div class="am-insight-text">As categorias com mais perda de venda por <strong>falta de estoque</strong> neste período foram:</div>
+    <div class="am-insight-list">
+      ${faltaOrd.slice(0,5).map(([c,n],idx) => `<div class="am-insight-item"><span class="am-insight-rank">${idx+1}º</span> ${c} <span class="am-insight-count">${n}x perdida${n>1?'s':''}</span></div>`).join('')}
+    </div>
+  ` : '<div class="am-insight-title">💡 Sem dados suficientes de falta de estoque neste período ainda.</div>';
+}
+
+window.trocarTab = trocarTabPrincipal;
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--am:#F5C800;--pr:#0A0A0A;--ce:#1A1A1A;--cm:#2A2A2A;--cb:#333;--br:#FFF;--vd:#22C55E;--vm:#EF4444;--az:#3B82F6;}
+:root{--am:#F5C800;--pr:#0A0A0A;--ce:#1A1A1A;--cm:#2A2A2A;--cb:#333;--br:#FFF;--vd:#22C55E;--vm:#EF4444;--az:#3B82F6;--rox:#A855F7;}
 body{font-family:'Inter',sans-serif;background:var(--pr);color:var(--br);min-height:100vh}
 header{background:var(--ce);border-bottom:2px solid var(--am);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .logo{font-size:22px;font-weight:900}.logo span{color:var(--am)}
@@ -127,10 +232,11 @@ header{background:var(--ce);border-bottom:2px solid var(--am);padding:14px 24px;
 .live-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:3px 10px;font-size:10px;color:var(--vd);font-weight:700}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--vd);animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tabs-principal{display:flex;border-bottom:1px solid var(--cb);background:var(--ce);padding:0 24px}
+.tab-principal{padding:13px 20px;font-size:13px;font-weight:600;color:#666;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab-principal.ativo{color:var(--am);border-bottom-color:var(--am)}
 main{padding:24px;max-width:1100px;margin:0 auto}
 .section-title{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-
-/* TOTALIZADOR */
 .total-card{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:20px;margin-bottom:28px}
 .total-titulo{font-size:13px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
 .total-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
@@ -139,8 +245,6 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .total-lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
 .bar-out{background:#222;border-radius:6px;height:8px;overflow:hidden}
 .bar-in{height:100%;background:linear-gradient(90deg,var(--am),#FFD700);border-radius:6px;transition:width .5s}
-
-/* GRID LOJAS */
 .lojas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
 .loja-card{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:18px;transition:border-color .2s}
 .loja-card:hover{border-color:#555}
@@ -160,7 +264,42 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .fila-mini-item.alm{color:#aaa;background:rgba(255,255,255,.04)}
 .fila-mini-item.casa{color:#666;background:rgba(255,255,255,.02)}
 .fila-mini-item.vazia{color:#444}
-@media(max-width:600px){.total-grid{grid-template-columns:repeat(3,1fr)}.lojas-grid{grid-template-columns:1fr}}
+
+/* ANÁLISE MENSAL */
+.am-filtros{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
+.am-select{background:var(--ce);border:1px solid var(--cb);border-radius:8px;color:var(--br);font-size:13px;font-family:'Inter',sans-serif;padding:10px 14px;outline:none;cursor:pointer}
+.am-select:focus{border-color:var(--am)}
+.btn-am-buscar{background:var(--am);color:var(--pr);border:none;border-radius:8px;font-size:13px;font-weight:800;padding:10px 20px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-am-buscar:hover{opacity:.9}
+.am-resumo{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.am-resumo-card{background:var(--ce);border:1px solid var(--cb);border-radius:10px;padding:16px;text-align:center}
+.am-resumo-num{font-size:26px;font-weight:900;color:var(--am)}
+.am-resumo-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.am-bloco{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:20px;margin-bottom:20px}
+.am-bloco-titulo{font-size:13px;font-weight:700;color:#aaa;margin-bottom:16px;text-transform:uppercase;letter-spacing:.5px}
+.am-bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.am-bar-label{font-size:12px;color:#ccc;width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.am-bar-track{flex:1;background:#222;border-radius:6px;height:18px;overflow:hidden}
+.am-bar-fill{height:100%;background:linear-gradient(90deg,#F97316,#FB923C);border-radius:6px;transition:width .5s}
+.am-bar-fill.cat{background:linear-gradient(90deg,var(--rox),#C084FC)}
+.am-bar-num{font-size:13px;font-weight:800;color:var(--am);width:30px;text-align:right;flex-shrink:0}
+.am-insight{background:linear-gradient(135deg,rgba(245,200,0,.08),rgba(245,200,0,.02));border:1px solid rgba(245,200,0,.25);border-radius:12px;padding:20px}
+.am-insight-title{font-size:14px;font-weight:800;color:var(--am);margin-bottom:8px}
+.am-insight-text{font-size:13px;color:#bbb;margin-bottom:14px;line-height:1.5}
+.am-insight-list{display:flex;flex-direction:column;gap:8px}
+.am-insight-item{font-size:13px;color:#eee;background:rgba(0,0,0,.2);padding:10px 14px;border-radius:8px;display:flex;align-items:center;gap:10px}
+.am-insight-rank{font-weight:900;color:var(--am);width:24px}
+.am-insight-count{margin-left:auto;color:#F97316;font-weight:700;font-size:11px}
+.empty-state{text-align:center;color:#555;font-size:13px}
+.empty-state .big{font-size:32px;margin-bottom:6px}
+#analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
+
+@media(max-width:600px){
+  .total-grid{grid-template-columns:repeat(3,1fr)}
+  .lojas-grid{grid-template-columns:1fr}
+  .am-bar-label{width:120px;font-size:11px}
+  .am-resumo{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -174,27 +313,73 @@ main{padding:24px;max-width:1100px;margin:0 auto}
     <span style="font-size:11px;color:#666" id="header-data"></span>
   </div>
 </header>
-<main>
-  <div style="margin-bottom:24px"></div>
 
-  <!-- TOTALIZADOR -->
-  <div class="total-card">
-    <div class="total-titulo">📊 Consolidado — Todas as lojas</div>
-    <div class="total-grid">
-      <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-total">—</div><div class="total-lbl">Total</div></div>
-      <div class="total-item"><div class="total-num" style="color:var(--vd)" id="g-vendas">—</div><div class="total-lbl">Vendas</div></div>
-      <div class="total-item"><div class="total-num" style="color:#FFD700"   id="g-vendoes">—</div><div class="total-lbl">Vendões</div></div>
-      <div class="total-item"><div class="total-num" style="color:var(--az)" id="g-trocas">—</div><div class="total-lbl">Trocas</div></div>
-      <div class="total-item"><div class="total-num" style="color:var(--vm)" id="g-saiu">—</div><div class="total-lbl">Sem venda</div></div>
-      <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-conv">—</div><div class="total-lbl">Conversão</div></div>
+<div class="tabs-principal">
+  <div class="tab-principal ativo" onclick="trocarTabPrincipal('hoje')">📊 Hoje — Ao Vivo</div>
+  <div class="tab-principal" onclick="trocarTabPrincipal('analise')">📈 Análise Mensal</div>
+</div>
+
+<main>
+  <!-- VIEW HOJE -->
+  <div id="view-hoje">
+    <div style="margin-bottom:24px"></div>
+    <div class="total-card">
+      <div class="total-titulo">📊 Consolidado — Todas as lojas (hoje)</div>
+      <div class="total-grid">
+        <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-total">—</div><div class="total-lbl">Total</div></div>
+        <div class="total-item"><div class="total-num" style="color:var(--vd)" id="g-vendas">—</div><div class="total-lbl">Vendas</div></div>
+        <div class="total-item"><div class="total-num" style="color:#FFD700"   id="g-vendoes">—</div><div class="total-lbl">Vendões</div></div>
+        <div class="total-item"><div class="total-num" style="color:var(--az)" id="g-trocas">—</div><div class="total-lbl">Trocas</div></div>
+        <div class="total-item"><div class="total-num" style="color:var(--vm)" id="g-saiu">—</div><div class="total-lbl">Sem venda</div></div>
+        <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-conv">—</div><div class="total-lbl">Conversão</div></div>
+      </div>
+      <div class="bar-out"><div class="bar-in" id="bar-g" style="width:0%"></div></div>
     </div>
-    <div class="bar-out"><div class="bar-in" id="bar-g" style="width:0%"></div></div>
+    <div class="section-title">Lojas — situação em tempo real</div>
+    <div class="lojas-grid" id="lojas-grid"><div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div></div>
   </div>
 
-  <!-- LOJAS -->
-  <div class="section-title">Lojas — situação em tempo real</div>
-  <div class="lojas-grid" id="lojas-grid">
-    <div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div>
+  <!-- VIEW ANÁLISE MENSAL -->
+  <div id="view-analise" style="display:none">
+    <div style="margin-bottom:24px"></div>
+    <div class="am-filtros">
+      <select class="am-select" id="sel-mes"></select>
+      <select class="am-select" id="sel-loja-analise">
+        <option value="todas">Todas as lojas</option>
+        <option value="praiamar">Praiamar</option>
+        <option value="miramar">Miramar</option>
+        <option value="azevedo">Azevedo</option>
+        <option value="praiagrande">Praia Grande</option>
+        <option value="bioritmo">Bioritmo</option>
+      </select>
+      <button class="btn-am-buscar" onclick="carregarAnaliseMensal()">🔍 Buscar</button>
+    </div>
+
+    <div id="analise-loading" style="display:none">⏳ Buscando dados do período selecionado...</div>
+
+    <div id="analise-conteudo" style="display:none">
+      <div class="am-resumo">
+        <div class="am-resumo-card"><div class="am-resumo-num" id="am-total">0</div><div class="am-resumo-lbl">Atendimentos no mês</div></div>
+        <div class="am-resumo-card"><div class="am-resumo-num" style="color:var(--vm)" id="am-saiu">0</div><div class="am-resumo-lbl">Saídas sem venda</div></div>
+        <div class="am-resumo-card"><div class="am-resumo-num" id="am-conv">—</div><div class="am-resumo-lbl">Conversão do mês</div></div>
+      </div>
+
+      <div class="am-bloco">
+        <div class="am-bloco-titulo">🔍 Motivos de não-venda — ranking do mês</div>
+        <div id="am-motivos"></div>
+      </div>
+
+      <div class="am-bloco">
+        <div class="am-bloco-titulo">🏷️ Categorias de produto mais perdidas</div>
+        <div id="am-categorias"></div>
+      </div>
+
+      <div class="am-insight" id="am-insight"></div>
+    </div>
+
+    <div style="color:#555;font-size:12px;text-align:center;margin-top:16px" id="analise-hint">
+      Selecione o mês e a loja, depois clique em "Buscar" para ver a análise.
+    </div>
   </div>
 </main>
 </body>
