@@ -305,7 +305,133 @@ function renderAnaliseMensal(atendimentos, selMes) {
 
 window.trocarTab = trocarTabPrincipal;
 
+window.gerarPDFRanking = function() {
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const agora = new Date();
+  const ds = agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const hs = agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const periodo = document.getElementById('rank-periodo');
+  const lojaEl  = document.getElementById('rank-loja');
+  const periodoLabel = periodo.options[periodo.selectedIndex].text;
+  const lojaLabel    = lojaEl.options[lojaEl.selectedIndex].text;
+
+  // Fundo
+  doc.setFillColor(10,10,10); doc.rect(0,0,210,297,'F');
+  // Faixa topo
+  doc.setFillColor(245,200,0); doc.rect(0,0,210,22,'F');
+  doc.setTextColor(10,10,10);
+  doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.text('LIVE!',14,14);
+  doc.setFontSize(10); doc.text('Ranking de Vendedoras — '+lojaLabel,50,10);
+  doc.setFont('helvetica','normal'); doc.text(periodoLabel+' · Gerado em '+ds+' às '+hs,50,16);
+
+  // Coletar dados dos rankings
+  function getDadosRank(id) {
+    const rows = document.querySelectorAll('#'+id+' .rank-row');
+    return Array.from(rows).map(r => ({
+      pos:  r.querySelector('.rank-pos')?.textContent || '',
+      nome: r.querySelector('.rank-nome')?.textContent || '',
+      num:  r.querySelector('.rank-num')?.textContent || '0',
+      de:   r.querySelector('.rank-de')?.textContent || '',
+    }));
+  }
+
+  const rankings = [
+    {titulo:'MAIS VENDÕES',  id:'rank-vendao', cor:[255,215,0]},
+    {titulo:'MAIS VENDAS',   id:'rank-venda',  cor:[34,197,94]},
+    {titulo:'MAIS TROCAS',   id:'rank-troca',  cor:[59,130,246]},
+    {titulo:'MAIS SEM VENDA',id:'rank-saiu',   cor:[239,68,68]},
+  ];
+
+  let y = 32;
+  rankings.forEach((rank, ri) => {
+    const dados = getDadosRank(rank.id);
+    const cx = ri % 2 === 0 ? 11 : 108;
+    if (ri === 2) y = 32 + 100; // segunda linha
+
+    // Box do ranking
+    doc.setFillColor(26,26,26); doc.roundedRect(cx, y, 92, dados.length>0?dados.length*14+22:36, 3,3,'F');
+    doc.setFillColor(...rank.cor); doc.roundedRect(cx, y, 92, 3, 1,1,'F');
+
+    // Título
+    doc.setTextColor(...rank.cor); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text(rank.titulo, cx+6, y+11);
+
+    if (dados.length === 0) {
+      doc.setTextColor(100,100,100); doc.setFontSize(8); doc.setFont('helvetica','normal');
+      doc.text('Nenhum registro', cx+6, y+24);
+    } else {
+      dados.forEach((d, i) => {
+        const ly = y + 20 + i*13;
+        if (i % 2 === 0) { doc.setFillColor(20,20,20); doc.rect(cx, ly-4, 92, 13,'F'); }
+        doc.setTextColor(220,220,220); doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text(d.pos, cx+4, ly+4);
+        doc.text(d.nome, cx+14, ly+4);
+        doc.setTextColor(...rank.cor); doc.setFont('helvetica','bold');
+        doc.text(d.num, cx+70, ly+4, {align:'right'});
+        doc.setTextColor(100,100,100); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+        doc.text(d.de, cx+86, ly+4, {align:'right'});
+      });
+    }
+  });
+
+  // Rodapé
+  doc.setFillColor(245,200,0); doc.rect(0,287,210,10,'F');
+  doc.setTextColor(10,10,10); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text('LIVE! Ranking · '+periodoLabel+' · '+lojaLabel,105,293,{align:'center'});
+
+  const blob = doc.output('blob');
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'LIVE_Ranking_'+periodoLabel.replace(/\s/g,'_')+'.pdf';
+  link.target = '_blank';
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(()=>{document.body.removeChild(link);URL.revokeObjectURL(url);},1000);
+}
+
 // ══════════════════ RANKING ══════════════════
+window.toggleDatasCustom = function() {
+  const v = document.getElementById('rank-periodo').value;
+  document.getElementById('bloco-datas-custom').style.display = v==='custom' ? 'block' : 'none';
+}
+
+window.setUltimos = function(dias) {
+  const fim = new Date();
+  const ini = new Date(); ini.setDate(ini.getDate() - (dias-1));
+  document.getElementById('rank-data-ini').value = ini.toISOString().split('T')[0];
+  document.getElementById('rank-data-fim').value = fim.toISOString().split('T')[0];
+}
+
+window.setSemanaAtual = function() {
+  const hoje = new Date();
+  const diaSemana = hoje.getDay(); // 0=dom
+  const ini = new Date(hoje); ini.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana-1));
+  document.getElementById('rank-data-ini').value = ini.toISOString().split('T')[0];
+  document.getElementById('rank-data-fim').value = hoje.toISOString().split('T')[0];
+}
+
+async function buscarAtendimentosPorDatas(dataIni, dataFim, lojasParaBuscar) {
+  let atendimentos = [];
+  const ini = new Date(dataIni + 'T00:00:00');
+  const fim = new Date(dataFim + 'T23:59:59');
+  for (let d = new Date(ini); d <= fim; d.setDate(d.getDate()+1)) {
+    const dataStr = d.toLocaleDateString('pt-BR').replace(/\//g,'-');
+    for (const lojaId of lojasParaBuscar) {
+      try {
+        const snap = await get(ref(db, `lojas/${lojaId}/atendimentos/${dataStr}`));
+        if (snap.exists()) {
+          const vals = Object.values(snap.val());
+          vals.forEach(v => v._loja = lojaId);
+          atendimentos = atendimentos.concat(vals);
+        }
+      } catch(e) {}
+    }
+  }
+  return atendimentos;
+}
+
 window.carregarRanking = async function() {
   const periodo = document.getElementById('rank-periodo').value;
   const lojaId  = document.getElementById('rank-loja').value;
@@ -323,13 +449,18 @@ window.carregarRanking = async function() {
       atendimentos = atendimentos.concat(dadosLojas[lid]?.atend || []);
     });
     renderRanking(atendimentos);
+  } else if (periodo === 'custom') {
+    const ini = document.getElementById('rank-data-ini').value;
+    const fim = document.getElementById('rank-data-fim').value;
+    if (!ini || !fim) { alert('Selecione a data inicial e final!'); document.getElementById('ranking-loading').style.display='none'; return; }
+    atendimentos = await buscarAtendimentosPorDatas(ini, fim, lojasParaBuscar);
+    renderRanking(atendimentos);
   } else {
     const anoMes = periodo === 'mes'
       ? {ano: agora.getFullYear(), mes: agora.getMonth()+1}
       : agora.getMonth() === 0
         ? {ano: agora.getFullYear()-1, mes: 12}
         : {ano: agora.getFullYear(), mes: agora.getMonth()};
-
     atendimentos = await buscarAtendimentosPeriodo(
       `${anoMes.ano}-${String(anoMes.mes).padStart(2,'0')}`,
       lojasParaBuscar
@@ -453,6 +584,8 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .empty-state{text-align:center;color:#555;font-size:13px}
 .empty-state .big{font-size:32px;margin-bottom:6px}
 #analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
+.atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
+.atalho-data:hover{opacity:.8}
 .ranking-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
 .ranking-bloco{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:18px}
 .ranking-titulo{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
@@ -461,7 +594,9 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .rank-nome{font-size:13px;font-weight:700;color:#ddd;flex:1}
 .rank-num{font-size:18px;font-weight:900;flex-shrink:0}
 .rank-de{font-size:10px;color:#555;flex-shrink:0;white-space:nowrap}
-@media(max-width:600px){.ranking-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
+.atalho-data:hover{opacity:.8}
+.ranking-grid{grid-template-columns:1fr}}
 .comp-header{display:flex;.comp-header{display:flex;gap:20px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #222}
 .comp-header-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#ddd}
 .comp-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -530,11 +665,12 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   <!-- VIEW RANKING -->
   <div id="view-ranking" style="display:none">
     <div style="margin-bottom:24px"></div>
-    <div class="am-filtros">
-      <select class="am-select" id="rank-periodo">
+    <div class="am-filtros" style="flex-wrap:wrap">
+      <select class="am-select" id="rank-periodo" onchange="toggleDatasCustom()">
         <option value="hoje">Hoje</option>
         <option value="mes">Mês atual</option>
         <option value="mes-anterior">Mês anterior</option>
+        <option value="custom">📅 Período personalizado</option>
       </select>
       <select class="am-select" id="rank-loja">
         <option value="todas">Todas as lojas</option>
@@ -546,8 +682,33 @@ main{padding:24px;max-width:1100px;margin:0 auto}
       </select>
       <button class="btn-am-buscar" onclick="carregarRanking()">🔍 Buscar</button>
     </div>
+    <div id="bloco-datas-custom" style="display:none;margin-bottom:16px;display:none">
+      <div class="am-filtros" style="background:var(--ce);border:1px solid var(--cb);border-radius:10px;padding:14px;flex-wrap:wrap">
+        <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px;width:100%;margin-bottom:8px">Período personalizado</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;color:#666;margin-bottom:4px">De</div>
+            <input type="date" class="am-select" id="rank-data-ini" style="cursor:pointer">
+          </div>
+          <div style="color:#555;margin-top:14px">→</div>
+          <div>
+            <div style="font-size:10px;color:#666;margin-bottom:4px">Até</div>
+            <input type="date" class="am-select" id="rank-data-fim" style="cursor:pointer">
+          </div>
+          <div style="font-size:11px;color:#666;margin-top:14px">
+            Atalhos: 
+            <span class="atalho-data" onclick="setUltimos(7)">7 dias</span> · 
+            <span class="atalho-data" onclick="setUltimos(14)">14 dias</span> · 
+            <span class="atalho-data" onclick="setSemanaAtual()">Esta semana</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="ranking-loading" style="display:none;text-align:center;padding:60px 0;color:#666;font-size:13px">⏳ Buscando dados...</div>
     <div id="ranking-conteudo" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+        <button class="btn-am-buscar" style="background:#1A1A1A;border:1px solid #444;color:#ccc" onclick="gerarPDFRanking()">⬇️ Baixar PDF</button>
+      </div>
       <div class="ranking-grid">
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:#FFD700">🏆 Mais Vendões</div>
