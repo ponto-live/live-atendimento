@@ -141,8 +141,9 @@ function popularSeletorMes() {
 }
 
 window.trocarTabPrincipal = function(t) {
-  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='analise')));
-  document.getElementById('view-hoje').style.display = t==='hoje' ? 'block':'none';
+  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')));
+  document.getElementById('view-hoje').style.display    = t==='hoje'    ? 'block':'none';
+  document.getElementById('view-ranking').style.display = t==='ranking' ? 'block':'none';
   document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
 }
 
@@ -303,6 +304,82 @@ function renderAnaliseMensal(atendimentos, selMes) {
 }
 
 window.trocarTab = trocarTabPrincipal;
+
+// ══════════════════ RANKING ══════════════════
+window.carregarRanking = async function() {
+  const periodo = document.getElementById('rank-periodo').value;
+  const lojaId  = document.getElementById('rank-loja').value;
+
+  document.getElementById('ranking-loading').style.display = 'block';
+  document.getElementById('ranking-conteudo').style.display = 'none';
+  document.getElementById('ranking-hint').style.display = 'none';
+
+  const lojasParaBuscar = lojaId === 'todas' ? LOJAS.map(l=>l.id) : [lojaId];
+  const agora = new Date();
+  let atendimentos = [];
+
+  if (periodo === 'hoje') {
+    lojasParaBuscar.forEach(lid => {
+      atendimentos = atendimentos.concat(dadosLojas[lid]?.atend || []);
+    });
+    renderRanking(atendimentos);
+  } else {
+    const anoMes = periodo === 'mes'
+      ? {ano: agora.getFullYear(), mes: agora.getMonth()+1}
+      : agora.getMonth() === 0
+        ? {ano: agora.getFullYear()-1, mes: 12}
+        : {ano: agora.getFullYear(), mes: agora.getMonth()};
+
+    atendimentos = await buscarAtendimentosPeriodo(
+      `${anoMes.ano}-${String(anoMes.mes).padStart(2,'0')}`,
+      lojasParaBuscar
+    );
+    renderRanking(atendimentos);
+  }
+}
+
+function renderRanking(atendimentos) {
+  document.getElementById('ranking-loading').style.display = 'none';
+  document.getElementById('ranking-conteudo').style.display = 'block';
+
+  // Agregar por vendedora
+  const stats = {};
+  atendimentos.forEach(a => {
+    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, saiu:0, total:0};
+    const s = stats[a.vendedora];
+    s.total++;
+    if (a.resultado==='venda') s.venda++;
+    else if (a.resultado==='vendao') s.vendao++;
+    else if (a.resultado==='troca_s'||a.resultado==='troca_c') s.troca++;
+    else if (a.resultado==='saiu') s.saiu++;
+  });
+
+  const vendedoras = Object.entries(stats);
+  if (!vendedoras.length) {
+    ['rank-vendao','rank-venda','rank-troca','rank-saiu'].forEach(id=>{
+      document.getElementById(id).innerHTML='<div class="empty-state" style="padding:20px"><div class="big">📋</div>Sem dados</div>';
+    });
+    return;
+  }
+
+  function renderLista(lista, campo, cor, medalhas=['🥇','🥈','🥉']) {
+    const ord = [...lista].sort((a,b)=>b[1][campo]-a[1][campo]).filter(([,v])=>v[campo]>0);
+    if (!ord.length) return '<div style="color:#555;font-size:12px;padding:16px">Nenhum registro</div>';
+    return ord.map(([nome,v],i) => `
+      <div class="rank-row">
+        <span class="rank-pos">${medalhas[i]||i+1+'º'}</span>
+        <span class="rank-nome">${nome}</span>
+        <span class="rank-num" style="color:${cor}">${v[campo]}</span>
+        <span class="rank-de">${v.total} atend.</span>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('rank-vendao').innerHTML = renderLista(vendedoras,'vendao','#FFD700');
+  document.getElementById('rank-venda').innerHTML  = renderLista(vendedoras,'venda','#22C55E');
+  document.getElementById('rank-troca').innerHTML  = renderLista(vendedoras,'troca','#3B82F6');
+  document.getElementById('rank-saiu').innerHTML   = renderLista(vendedoras,'saiu','#EF4444');
+}
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -376,7 +453,16 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .empty-state{text-align:center;color:#555;font-size:13px}
 .empty-state .big{font-size:32px;margin-bottom:6px}
 #analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
-.comp-header{display:flex;gap:20px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #222}
+.ranking-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+.ranking-bloco{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:18px}
+.ranking-titulo{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+.rank-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;margin-bottom:6px;background:var(--cm)}
+.rank-pos{font-size:16px;width:28px;flex-shrink:0;text-align:center}
+.rank-nome{font-size:13px;font-weight:700;color:#ddd;flex:1}
+.rank-num{font-size:18px;font-weight:900;flex-shrink:0}
+.rank-de{font-size:10px;color:#555;flex-shrink:0;white-space:nowrap}
+@media(max-width:600px){.ranking-grid{grid-template-columns:1fr}}
+.comp-header{display:flex;.comp-header{display:flex;gap:20px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #222}
 .comp-header-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#ddd}
 .comp-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .comp-dot.a{background:var(--am)}.comp-dot.b{background:var(--rox)}
@@ -417,6 +503,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 
 <div class="tabs-principal">
   <div class="tab-principal ativo" onclick="trocarTabPrincipal('hoje')">📊 Hoje — Ao Vivo</div>
+  <div class="tab-principal" onclick="trocarTabPrincipal('ranking')">🏆 Ranking</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('analise')">📈 Análise Mensal</div>
 </div>
 
@@ -438,6 +525,49 @@ main{padding:24px;max-width:1100px;margin:0 auto}
     </div>
     <div class="section-title">Lojas — situação em tempo real</div>
     <div class="lojas-grid" id="lojas-grid"><div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div></div>
+  </div>
+
+  <!-- VIEW RANKING -->
+  <div id="view-ranking" style="display:none">
+    <div style="margin-bottom:24px"></div>
+    <div class="am-filtros">
+      <select class="am-select" id="rank-periodo">
+        <option value="hoje">Hoje</option>
+        <option value="mes">Mês atual</option>
+        <option value="mes-anterior">Mês anterior</option>
+      </select>
+      <select class="am-select" id="rank-loja">
+        <option value="todas">Todas as lojas</option>
+        <option value="praiamar">Praiamar</option>
+        <option value="miramar">Miramar</option>
+        <option value="azevedo">Azevedo</option>
+        <option value="praiagrande">Praia Grande</option>
+        <option value="bioritmo">Bioritmo</option>
+      </select>
+      <button class="btn-am-buscar" onclick="carregarRanking()">🔍 Buscar</button>
+    </div>
+    <div id="ranking-loading" style="display:none;text-align:center;padding:60px 0;color:#666;font-size:13px">⏳ Buscando dados...</div>
+    <div id="ranking-conteudo" style="display:none">
+      <div class="ranking-grid">
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:#FFD700">🏆 Mais Vendões</div>
+          <div id="rank-vendao"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:var(--vd)">✅ Mais Vendas</div>
+          <div id="rank-venda"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:var(--az)">🔄 Mais Trocas</div>
+          <div id="rank-troca"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:var(--vm)">❌ Mais Sem Venda</div>
+          <div id="rank-saiu"></div>
+        </div>
+      </div>
+    </div>
+    <div style="color:#555;font-size:12px;text-align:center;margin-top:16px" id="ranking-hint">Selecione o período e a loja, depois clique em "Buscar".</div>
   </div>
 
   <!-- VIEW ANÁLISE MENSAL -->
