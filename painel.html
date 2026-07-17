@@ -38,6 +38,13 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('header-data').textContent =
     new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
 
+  iniciarListeners();
+  popularSeletorMes();
+  agendarMeiaNoitePainel();
+});
+
+function iniciarListeners() {
+  const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
   LOJAS.forEach(l => {
     dadosLojas[l.id] = {fila:[], atend:[]};
     onValue(ref(db, `lojas/${l.id}/fila`), snap => {
@@ -49,10 +56,28 @@ window.addEventListener('DOMContentLoaded', () => {
       renderTudo();
     });
   });
+}
 
-  // Popular seletor de mês
-  popularSeletorMes();
-});
+function agendarMeiaNoitePainel() {
+  const agora = new Date();
+  const meiaNoite = new Date(agora);
+  meiaNoite.setDate(agora.getDate() + 1);
+  meiaNoite.setHours(0, 0, 15, 0); // 15s depois da meia-noite
+  const msAte = meiaNoite - agora;
+
+  setTimeout(() => {
+    // Atualiza data no header
+    document.getElementById('header-data').textContent =
+      new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+    // Zera os dados e reinicia listeners pro novo dia
+    LOJAS.forEach(l => { dadosLojas[l.id] = {fila:[], atend:[]}; });
+    iniciarListeners();
+
+    // Agenda próxima meia-noite
+    agendarMeiaNoitePainel();
+  }, msAte);
+}
 
 function renderTudo() {
   let gTotal=0, gVendas=0, gVendoes=0, gTrocas=0, gSaiu=0;

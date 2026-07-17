@@ -38,19 +38,21 @@ let filaRef, atendRef;
 window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('header-data').textContent =
     new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'});
+  await iniciarDia();
+  agendarMeiaNoite();
+});
 
+async function iniciarDia() {
   const hoje = dataHoje();
-  filaRef   = ref(db, `lojas/${LOJA_ID}/fila`);
-  atendRef  = ref(db, `lojas/${LOJA_ID}/atendimentos/${hoje}`);
+  filaRef  = ref(db, `lojas/${LOJA_ID}/fila`);
+  atendRef = ref(db, `lojas/${LOJA_ID}/atendimentos/${hoje}`);
 
-  // Inicializa fila se não existir
   const snap = await get(filaRef);
   if (!snap.exists()) {
     const filaInicial = VENDEDORAS_INICIAIS.map(n => ({nome: n, status: 'aguarda'}));
     await set(filaRef, filaInicial);
   }
 
-  // Listeners em tempo real
   onValue(filaRef, snap => {
     fila = snap.val() ? Object.values(snap.val()) : VENDEDORAS_INICIAIS.map(n=>({nome:n,status:'aguarda'}));
     renderFila();
@@ -59,7 +61,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     atendimentos = snap.val() ? Object.values(snap.val()) : [];
     renderRegistros();
   });
-});
+}
+
+function agendarMeiaNoite() {
+  const agora = new Date();
+  const meiaNoite = new Date(agora);
+  meiaNoite.setDate(agora.getDate() + 1);
+  meiaNoite.setHours(0, 0, 10, 0);
+  const msAte = meiaNoite - agora;
+
+  setTimeout(async () => {
+    // Move todas pra casa automaticamente
+    const filaReset = fila.map(v => ({...v, status: 'casa'}));
+    await set(filaRef, filaReset);
+
+    // Atualiza header com novo dia
+    document.getElementById('header-data').textContent =
+      new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'});
+
+    // Reconecta listener pro novo dia
+    await iniciarDia();
+
+    // Agenda próxima meia-noite
+    agendarMeiaNoite();
+  }, msAte);
+}
 
 function dataHoje() { return new Date().toLocaleDateString('pt-BR').replace(/\//g,'-'); }
 function hora() { return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
