@@ -107,8 +107,22 @@ window.trocarTab = function(t) {
 // ══ FILA ══
 function renderFila() {
   const el = document.getElementById('fila-grid');
+
+  // Ordenar: atendendo > aguarda (em ordem) > almoco > casa
+  const ordemStatus = {atendendo:0, aguarda:1, almoco:2, casa:3};
+  // Preservar índices originais para as ações
+  const filaComIdx = fila.map((v,i) => ({...v, _idx:i}));
+  const filaOrdenada = [...filaComIdx].sort((a,b) => {
+    const oa = ordemStatus[a.status] ?? 4;
+    const ob = ordemStatus[b.status] ?? 4;
+    if (oa !== ob) return oa - ob;
+    // Dentro do mesmo status, manter ordem original
+    return a._idx - b._idx;
+  });
+
   const vezIdx = fila.findIndex(v => v.status === 'aguarda');
-  el.innerHTML = fila.map((v,i) => {
+  el.innerHTML = filaOrdenada.map((v) => {
+    const i = v._idx;
     const isVez=i===vezIdx, atend=v.status==='atendendo', alm=v.status==='almoco', casa=v.status==='casa';
     let cc='card-v';
     if(alm) cc+=' almoco'; else if(casa) cc+=' casa'; else if(atend) cc+=' atendendo'; else if(isVez) cc+=' vez';
