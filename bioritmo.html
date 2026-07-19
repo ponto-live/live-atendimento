@@ -47,11 +47,26 @@ async function iniciarDia() {
   filaRef  = ref(db, `lojas/${LOJA_ID}/fila`);
   atendRef = ref(db, `lojas/${LOJA_ID}/atendimentos/${hoje}`);
 
-  const snap = await get(filaRef);
-  if (!snap.exists()) {
+  // Verifica se é um novo dia comparando com último dia salvo no Firebase
+  const ultimoDiaRef = ref(db, `lojas/${LOJA_ID}/ultimoDia`);
+  const ultimoDiaSnap = await get(ultimoDiaRef);
+  const ultimoDia = ultimoDiaSnap.exists() ? ultimoDiaSnap.val() : null;
+
+  const snapFila = await get(filaRef);
+
+  if (!snapFila.exists()) {
+    // Primeira vez — inicializa fila normal
     const filaInicial = VENDEDORAS_INICIAIS.map(n => ({nome: n, status: 'aguarda'}));
     await set(filaRef, filaInicial);
+  } else if (ultimoDia && ultimoDia !== hoje) {
+    // Novo dia! Move todas pra casa
+    const filaAtual = Object.values(snapFila.val());
+    const filaReset = filaAtual.map(v => ({...v, status: 'casa'}));
+    await set(filaRef, filaReset);
   }
+
+  // Salva o dia atual como último dia
+  await set(ultimoDiaRef, hoje);
 
   onValue(filaRef, snap => {
     fila = snap.val() ? Object.values(snap.val()) : VENDEDORAS_INICIAIS.map(n=>({nome:n,status:'aguarda'}));
