@@ -362,10 +362,11 @@ window.gerarPDFRanking = function() {
   }
 
   const rankings = [
-    {titulo:'MAIS VENDÕES',  id:'rank-vendao', cor:[255,215,0]},
-    {titulo:'MAIS VENDAS',   id:'rank-venda',  cor:[34,197,94]},
-    {titulo:'MAIS TROCAS',   id:'rank-troca',  cor:[59,130,246]},
-    {titulo:'MAIS SEM VENDA',id:'rank-saiu',   cor:[239,68,68]},
+    {titulo:'MAIS VENDÕES',         id:'rank-vendao',  cor:[255,215,0]},
+    {titulo:'MAIS VENDAS',          id:'rank-venda',   cor:[34,197,94]},
+    {titulo:'MAIS TROCAS',          id:'rank-troca',   cor:[59,130,246]},
+    {titulo:'TROCAS COM DIFERENÇA', id:'rank-troca-c', cor:[168,85,247]},
+    {titulo:'MAIS SEM VENDA',       id:'rank-saiu',    cor:[239,68,68]},
   ];
 
   let y = 32;
@@ -501,12 +502,13 @@ function renderRanking(atendimentos) {
   // Agregar por vendedora
   const stats = {};
   atendimentos.forEach(a => {
-    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, saiu:0, total:0};
+    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, total:0};
     const s = stats[a.vendedora];
     s.total++;
     if (a.resultado==='venda') s.venda++;
     else if (a.resultado==='vendao') s.vendao++;
-    else if (a.resultado==='troca_s'||a.resultado==='troca_c') s.troca++;
+    else if (a.resultado==='troca_s') s.troca++;
+    else if (a.resultado==='troca_c') { s.troca++; s.troca_c++; }
     else if (a.resultado==='saiu') s.saiu++;
   });
 
@@ -531,10 +533,11 @@ function renderRanking(atendimentos) {
     `).join('');
   }
 
-  document.getElementById('rank-vendao').innerHTML = renderLista(vendedoras,'vendao','#FFD700');
-  document.getElementById('rank-venda').innerHTML  = renderLista(vendedoras,'venda','#22C55E');
-  document.getElementById('rank-troca').innerHTML  = renderLista(vendedoras,'troca','#3B82F6');
-  document.getElementById('rank-saiu').innerHTML   = renderLista(vendedoras,'saiu','#EF4444');
+  document.getElementById('rank-vendao').innerHTML   = renderLista(vendedoras,'vendao','#FFD700');
+  document.getElementById('rank-venda').innerHTML    = renderLista(vendedoras,'venda','#22C55E');
+  document.getElementById('rank-troca').innerHTML    = renderLista(vendedoras,'troca','#3B82F6');
+  document.getElementById('rank-troca-c').innerHTML  = renderLista(vendedoras,'troca_c','#A855F7');
+  document.getElementById('rank-saiu').innerHTML     = renderLista(vendedoras,'saiu','#EF4444');
 }
 </script>
 <style>
@@ -612,6 +615,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
 .atalho-data:hover{opacity:.8}
 .ranking-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+@media(min-width:900px){.ranking-grid{grid-template-columns:repeat(3,1fr)}}
 .ranking-bloco{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:18px}
 .ranking-titulo{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
 .rank-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;margin-bottom:6px;background:var(--cm)}
@@ -746,6 +750,10 @@ main{padding:24px;max-width:1100px;margin:0 auto}
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:var(--az)">🔄 Mais Trocas</div>
           <div id="rank-troca"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:var(--rox)">💳 Trocas com Diferença</div>
+          <div id="rank-troca-c"></div>
         </div>
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:var(--vm)">❌ Mais Sem Venda</div>
