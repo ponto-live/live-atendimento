@@ -748,10 +748,8 @@ function renderRanking(atendimentos) {
     <div class="rank-row">
       <span class="rank-pos">${medalhas[i]||i+1+'º'}</span>
       <span class="rank-nome">${nome}</span>
-      <div style="text-align:right;flex-shrink:0">
-        <div class="rank-num" style="color:#FFD700;font-size:14px">R$${v.maiorVendao.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
-        <div style="font-size:9px;color:#666">${v.vendao} vendão(ões) · total R$${v.totalVendao.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
-      </div>
+      <span class="rank-num" style="color:#FFD700">${v.vendao}</span>
+      <span class="rank-de">${v.total} atend.</span>
     </div>
   `).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhum vendão com valor registrado</div>';
 }
@@ -1198,7 +1196,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
           <div id="rank-troca-c"></div>
         </div>
         <div class="ranking-bloco">
-          <div class="ranking-titulo" style="color:#FFD700">💰 Maior Vendão (valor)</div>
+          <div class="ranking-titulo" style="color:#FFD700">🏆 Maior Vendão do Período</div>
           <div id="rank-maior-vendao"></div>
         </div>
         <div class="ranking-bloco">
