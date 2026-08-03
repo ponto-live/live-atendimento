@@ -340,6 +340,15 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ed-data').value = ontem.toISOString().split('T')[0];
 }, {once:false});
 
+// Mapa fixo de vendedoras por loja
+const VENDEDORAS_MAPA = {
+  praiamar:    ['André','Izabelle','Daniele','Bianca','Mariana'],
+  miramar:     ['Letícia','Mirella','Dulce','Jéssika'],
+  azevedo:     ['Débora','Raisa','Mariela'],
+  praiagrande: ['Tainã','Karen','Dayana','Ana Lis'],
+  bioritmo:    ['Fernanda','Maria Eduarda'],
+};
+
 window.carregarEdicao = async function() {
   edLojaId = document.getElementById('ed-loja').value;
   const dataInput = document.getElementById('ed-data').value;
@@ -404,23 +413,21 @@ window.excluirAtend = async function(id) {
 
 // Preencher vendedoras do seletor
 function popularVendedoras(lojaId, selId, valorAtual) {
-  const mapa = {
-    praiamar:    ['André','Izabelle','Daniele','Bianca','Mariana'],
-    miramar:     ['Letícia','Mirella','Dulce','Jéssika'],
-    azevedo:     ['Débora','Raisa','Mariela'],
-    praiagrande: ['Tainã','Karen','Dayana','Ana Lis'],
-    bioritmo:    ['Fernanda','Maria Eduarda'],
-  };
   const sel = document.getElementById(selId);
-  const lista = mapa[lojaId] || [];
+  const lista = VENDEDORAS_MAPA[lojaId] || [];
   sel.innerHTML = lista.map(n=>`<option value="${n}" ${n===valorAtual?'selected':''}>${n}</option>`).join('');
+  // Se tiver um valor atual que não está na lista (vendedora antiga), adiciona mesmo assim
+  if (valorAtual && !lista.includes(valorAtual)) {
+    sel.innerHTML += `<option value="${valorAtual}" selected>${valorAtual}</option>`;
+  }
 }
 
 window.abrirModalNovoAtend = function() {
   edIdEditando = null;
+  const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
   document.getElementById('modal-ed-titulo').textContent = 'Novo atendimento';
-  document.getElementById('modal-ed-sub').textContent = edData + ' · ' + (document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text);
-  popularVendedoras(edLojaId, 'ed-vendedora', '');
+  document.getElementById('modal-ed-sub').textContent = edData + ' · ' + lojaLabel;
+  popularVendedoras(edLojaId, 'ed-vendedora', (VENDEDORAS_MAPA[edLojaId]||[])[0]);
   document.getElementById('ed-resultado').value = 'venda';
   document.getElementById('ed-hora').value = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('ed-valor-vendao').value = '';
