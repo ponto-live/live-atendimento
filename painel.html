@@ -786,8 +786,8 @@ document.addEventListener('click', function(e) {
   }
   // Excluir (delegação de evento)
   if (e.target.classList.contains('btn-excluir-ed')) {
-    const id = e.target.dataset.id;
-    edExcluir(id);
+    const idx = parseInt(e.target.dataset.idx);
+    edExcluirPorIdx(idx);
   }
   // Salvar modal
   if (e.target.id === 'btn-ed-salvar') edSalvarModal();
@@ -841,7 +841,7 @@ function edRenderLista() {
         <span class="ed-vend">${a.vendedora}</span>
         <span class="ed-hora">${a.hora||''}</span>
         <button class="btn-editar" data-idx="${i}">✏️ Editar</button>
-        <button class="btn-excluir-ed" data-id="${a.id}">🗑️</button>
+        <button class="btn-excluir-ed" data-idx="${i}">🗑️</button>
       </div>
     </div>`).join('') : '<div style="color:#555;font-size:13px;text-align:center;padding:40px">Nenhum atendimento neste dia.</div>';
 }
@@ -913,9 +913,12 @@ function edFecharModal() {
   _edEditIdx = null;
 }
 
-async function edExcluir(id) {
+async function edExcluirPorIdx(idx) {
   if (!confirm('Remover este atendimento?')) return;
-  _edList = _edList.filter(a => String(a.id) !== String(id));
+  // A lista é exibida em ordem reversa, então converter índice visual para índice real
+  const idxReal = _edList.length - 1 - idx;
+  if (idxReal < 0 || idxReal >= _edList.length) { alert('Registro não encontrado.'); return; }
+  _edList.splice(idxReal, 1);
   await edSalvarFirebase();
   edRenderLista();
 }
