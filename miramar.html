@@ -178,8 +178,10 @@ window.abrirModalReg = function(i) {
   document.getElementById('bloco-diferenca').style.display='none';
   document.getElementById('bloco-outro').style.display='none';
   document.getElementById('bloco-categoria').style.display='none';
+  document.getElementById('bloco-valor-vendao').style.display='none';
   document.getElementById('input-outro').value='';
   document.getElementById('input-diferenca').value='';
+  document.getElementById('input-valor-vendao').value='';
   document.getElementById('select-categoria').value='';
   document.getElementById('btn-confirmar').disabled=true;
   document.getElementById('modal-reg').classList.add('show');
@@ -192,13 +194,17 @@ window.selRes = function(tipo){
   document.querySelectorAll('.btn-mot').forEach(b=>b.classList.remove('ativo'));
   document.getElementById('bloco-outro').style.display='none';
   document.getElementById('bloco-categoria').style.display='none';
+  document.getElementById('bloco-valor-vendao').style.display='none';
   document.getElementById('input-outro').value='';
   document.getElementById('input-diferenca').value='';
+  document.getElementById('input-valor-vendao').value='';
   document.getElementById('select-categoria').value='';
   const mapa={venda:'av',vendao:'avip',troca_s:'at',troca_c:'at',saiu:'as'};
   document.getElementById('br-'+tipo).classList.add(mapa[tipo]);
   document.getElementById('bloco-motivos').style.display=(tipo==='saiu')?'block':'none';
   document.getElementById('bloco-diferenca').style.display=(tipo==='troca_c')?'block':'none';
+  document.getElementById('bloco-valor-vendao').style.display=(tipo==='vendao')?'block':'none';
+  if(tipo!=='vendao') document.getElementById('input-valor-vendao').value='';
   atualizaBtn();
 }
 window.selMot = function(btn,mot){
@@ -222,6 +228,7 @@ window.atualizaBtn = function(){
     }
   }
   if(resSel==='troca_c'){ok=document.getElementById('input-diferenca').value.trim().length>0&&parseFloat(document.getElementById('input-diferenca').value)>=0;}
+  if(resSel==='vendao'){ok=document.getElementById('input-valor-vendao').value.trim().length>0&&parseFloat(document.getElementById('input-valor-vendao').value)>=1000;}
   document.getElementById('btn-confirmar').disabled=!ok;
 }
 window.confirmar = async function(){
@@ -233,7 +240,9 @@ window.confirmar = async function(){
     if(motivosComCategoria.includes(motSel)) categoria = document.getElementById('select-categoria').value;
   }
   if(resSel==='troca_c'){diferenca=parseFloat(document.getElementById('input-diferenca').value);}
-  atendimentos.push({id:Date.now(),resultado:resSel,motivo:motivo||null,categoria:categoria||null,diferenca:diferenca||null,vendedora:nome,hora:hora()});
+  let valorVendao=null;
+  if(resSel==='vendao'){valorVendao=parseFloat(document.getElementById('input-valor-vendao').value);}
+  atendimentos.push({id:Date.now(),resultado:resSel,motivo:motivo||null,categoria:categoria||null,diferenca:diferenca||null,valorVendao:valorVendao||null,vendedora:nome,hora:hora()});
   const v=fila.splice(i,1)[0]; v.status='aguarda'; delete v.preferencia; fila.push(v);
   await salvarFila();
   await salvarAtend();
@@ -588,6 +597,9 @@ main{padding:20px;max-width:860px;margin:0 auto}
     </div>
     <div id="bloco-diferenca">
       <input class="input-val" id="input-diferenca" type="number" min="0" step="0.01" placeholder="Valor da diferença (R$)" oninput="atualizaBtn()">
+    </div>
+    <div id="bloco-valor-vendao" style="display:none;margin-top:8px">
+      <input class="input-val" id="input-valor-vendao" type="number" min="1000" step="0.01" placeholder="Valor do Vendão (R$)" oninput="atualizaBtn()">
     </div>
     <div class="grupo-titulo">❌ Saiu sem comprar</div>
     <div class="res-grid col1">

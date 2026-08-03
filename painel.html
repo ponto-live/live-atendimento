@@ -362,11 +362,12 @@ window.gerarPDFRanking = function() {
   }
 
   const rankings = [
-    {titulo:'MAIS VENDÕES',         id:'rank-vendao',  cor:[255,215,0]},
-    {titulo:'MAIS VENDAS',          id:'rank-venda',   cor:[34,197,94]},
-    {titulo:'MAIS TROCAS',          id:'rank-troca',   cor:[59,130,246]},
-    {titulo:'TROCAS COM DIFERENÇA', id:'rank-troca-c', cor:[168,85,247]},
-    {titulo:'MAIS SEM VENDA',       id:'rank-saiu',    cor:[239,68,68]},
+    {titulo:'MAIS VENDÕES',         id:'rank-vendao',       cor:[255,215,0]},
+    {titulo:'MAIS VENDAS',          id:'rank-venda',        cor:[34,197,94]},
+    {titulo:'MAIOR VENDÃO (VALOR)', id:'rank-maior-vendao', cor:[255,215,0]},
+    {titulo:'MAIS TROCAS',          id:'rank-troca',        cor:[59,130,246]},
+    {titulo:'TROCAS COM DIFERENÇA', id:'rank-troca-c',      cor:[168,85,247]},
+    {titulo:'MAIS SEM VENDA',       id:'rank-saiu',         cor:[239,68,68]},
   ];
 
   let y = 32;
@@ -502,11 +503,14 @@ function renderRanking(atendimentos) {
   // Agregar por vendedora
   const stats = {};
   atendimentos.forEach(a => {
-    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, total:0};
+    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, total:0, totalVendao:0, maiorVendao:0};
     const s = stats[a.vendedora];
     s.total++;
     if (a.resultado==='venda') s.venda++;
-    else if (a.resultado==='vendao') s.vendao++;
+    else if (a.resultado==='vendao') {
+      s.vendao++;
+      if(a.valorVendao){ s.totalVendao+=a.valorVendao; if(a.valorVendao>s.maiorVendao) s.maiorVendao=a.valorVendao; }
+    }
     else if (a.resultado==='troca_s') s.troca++;
     else if (a.resultado==='troca_c') { s.troca++; s.troca_c++; }
     else if (a.resultado==='saiu') s.saiu++;
@@ -538,6 +542,20 @@ function renderRanking(atendimentos) {
   document.getElementById('rank-troca').innerHTML    = renderLista(vendedoras,'troca','#3B82F6');
   document.getElementById('rank-troca-c').innerHTML  = renderLista(vendedoras,'troca_c','#A855F7');
   document.getElementById('rank-saiu').innerHTML     = renderLista(vendedoras,'saiu','#EF4444');
+
+  // Ranking de maior vendão por valor
+  const comVendao = vendedoras.filter(([,v])=>v.maiorVendao>0).sort((a,b)=>b[1].maiorVendao-a[1].maiorVendao);
+  const medalhas = ['🥇','🥈','🥉'];
+  document.getElementById('rank-maior-vendao').innerHTML = comVendao.length ? comVendao.map(([nome,v],i)=>`
+    <div class="rank-row">
+      <span class="rank-pos">${medalhas[i]||i+1+'º'}</span>
+      <span class="rank-nome">${nome}</span>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="rank-num" style="color:#FFD700;font-size:14px">R$${v.maiorVendao.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+        <div style="font-size:9px;color:#666">${v.vendao} vendão(ões) · total R$${v.totalVendao.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+      </div>
+    </div>
+  `).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhum vendão com valor registrado</div>';
 }
 </script>
 <style>
@@ -754,6 +772,10 @@ main{padding:24px;max-width:1100px;margin:0 auto}
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:var(--rox)">💳 Trocas com Diferença</div>
           <div id="rank-troca-c"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:#FFD700">💰 Maior Vendão (valor)</div>
+          <div id="rank-maior-vendao"></div>
         </div>
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:var(--vm)">❌ Mais Sem Venda</div>
