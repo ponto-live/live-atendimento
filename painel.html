@@ -379,7 +379,7 @@ function renderEdicao() {
   const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
   const rm={venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
 
-  document.getElementById('ed-lista').innerHTML = edAtendimentos.length ? [...edAtendimentos].reverse().map(a=>`
+  document.getElementById('ed-lista').innerHTML = edAtendimentos.length ? [...edAtendimentos].reverse().map((a,_i)=>`
     <div class="ed-item">
       <div class="ed-item-left">
         <div class="ed-item-em">${em[a.resultado]||'?'}</div>
@@ -391,7 +391,7 @@ function renderEdicao() {
       <div class="ed-item-right">
         <span class="ed-item-vend">${a.vendedora}</span>
         <span class="ed-item-hora">${a.hora||''}</span>
-        <button class="btn-ed" onclick="abrirModalEditar(${a.id})">✏️ Editar</button>
+        <button class="btn-ed" onclick="abrirModalEditar(${_i})">✏️ Editar</button>
         <button class="btn-del-ed" onclick="excluirAtend(${a.id})">🗑️</button>
       </div>
     </div>
@@ -406,7 +406,8 @@ async function salvarAtendimentos() {
 
 window.excluirAtend = async function(id) {
   if (!confirm('Remover este atendimento?')) return;
-  edAtendimentos = edAtendimentos.filter(a => a.id !== id);
+  // Comparar como string para evitar problema de tipo
+  edAtendimentos = edAtendimentos.filter(a => String(a.id) !== String(id));
   await salvarAtendimentos();
   renderEdicao();
 }
@@ -437,19 +438,23 @@ window.abrirModalNovoAtend = function() {
   document.getElementById('modal-ed').classList.add('show');
 }
 
-window.abrirModalEditar = function(id) {
-  const a = edAtendimentos.find(x=>x.id===id);
-  if (!a) return;
-  edIdEditando = id;
+window.abrirModalEditar = function(idx) {
+  // Usar índice direto para evitar problema de tipo de ID
+  const lista = [...edAtendimentos].reverse();
+  const a = lista[idx];
+  if (!a) { alert('Registro não encontrado.'); return; }
+  edIdEditando = a.id;
+  const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
   document.getElementById('modal-ed-titulo').textContent = 'Editar atendimento';
-  document.getElementById('modal-ed-sub').textContent = edData + ' · ' + (document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text);
+  document.getElementById('modal-ed-sub').textContent = edData + ' · ' + lojaLabel + ' · ' + a.vendedora;
   popularVendedoras(edLojaId, 'ed-vendedora', a.vendedora);
-  document.getElementById('ed-resultado').value = a.resultado;
+  document.getElementById('ed-resultado').value = a.resultado || 'venda';
   document.getElementById('ed-hora').value = a.hora || '';
   document.getElementById('ed-valor-vendao').value = a.valorVendao || '';
   document.getElementById('ed-diferenca').value = a.diferenca || '';
   document.getElementById('ed-motivo').value = a.motivo || 'Produto não tinha na loja';
   document.getElementById('ed-categoria').value = a.categoria || '';
+  document.getElementById('ed-motivo-outro').value = '';
   toggleEdCampos();
   toggleEdCategoria();
   document.getElementById('modal-ed').classList.add('show');
@@ -500,7 +505,7 @@ window.salvarEdicao = async function() {
   }
 
   if (edIdEditando) {
-    const idx = edAtendimentos.findIndex(a=>a.id===edIdEditando);
+    const idx = edAtendimentos.findIndex(a=>String(a.id)===String(edIdEditando));
     if (idx>=0) edAtendimentos[idx] = {...edAtendimentos[idx], resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria};
   } else {
     edAtendimentos.push({id:Date.now(), resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria});
