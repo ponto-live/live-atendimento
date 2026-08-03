@@ -166,11 +166,11 @@ function popularSeletorMes() {
 }
 
 window.trocarTabPrincipal = function(t) {
-  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||));
+  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||(i===3&&t==='edicao')));
   document.getElementById('view-hoje').style.display    = t==='hoje'    ? 'block':'none';
   document.getElementById('view-ranking').style.display = t==='ranking' ? 'block':'none';
   document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
-
+  document.getElementById('view-edicao').style.display  = t==='edicao'  ? 'block':'none';
 }
 
 async function buscarAtendimentosPeriodo(selValor, lojasParaBuscar) {
