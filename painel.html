@@ -166,10 +166,11 @@ function popularSeletorMes() {
 }
 
 window.trocarTabPrincipal = function(t) {
-  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')));
+  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||(i===3&&t==='edicao')));
   document.getElementById('view-hoje').style.display    = t==='hoje'    ? 'block':'none';
   document.getElementById('view-ranking').style.display = t==='ranking' ? 'block':'none';
   document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
+  document.getElementById('view-edicao').style.display  = t==='edicao'  ? 'block':'none';
 }
 
 async function buscarAtendimentosPeriodo(selValor, lojasParaBuscar) {
@@ -329,6 +330,179 @@ function renderAnaliseMensal(atendimentos, selMes) {
 }
 
 window.trocarTab = trocarTabPrincipal;
+
+// ══════════════════ EDIÇÃO ══════════════════
+let edLojaId = null, edData = null, edAtendimentos = [], edIdEditando = null;
+
+// Setar data padrão como ontem
+window.addEventListener('DOMContentLoaded', () => {
+  const ontem = new Date(); ontem.setDate(ontem.getDate()-1);
+  document.getElementById('ed-data').value = ontem.toISOString().split('T')[0];
+}, {once:false});
+
+window.carregarEdicao = async function() {
+  edLojaId = document.getElementById('ed-loja').value;
+  const dataInput = document.getElementById('ed-data').value;
+  if (!edLojaId || !dataInput) { alert('Selecione a loja e a data!'); return; }
+
+  const [ano,mes,dia] = dataInput.split('-');
+  edData = `${dia}-${mes}-${ano}`;
+
+  document.getElementById('ed-loading').style.display = 'block';
+  document.getElementById('ed-conteudo').style.display = 'none';
+  document.getElementById('ed-hint').style.display = 'none';
+
+  try {
+    const snap = await get(ref(db, `lojas/${edLojaId}/atendimentos/${edData}`));
+    edAtendimentos = snap.exists() ? Object.values(snap.val()) : [];
+    renderEdicao();
+  } catch(e) {
+    alert('Erro ao buscar dados: '+e.message);
+  }
+  document.getElementById('ed-loading').style.display = 'none';
+  document.getElementById('ed-conteudo').style.display = 'block';
+}
+
+function renderEdicao() {
+  const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
+  document.getElementById('ed-titulo').textContent = `${lojaLabel} — ${edData} (${edAtendimentos.length} atendimentos)`;
+
+  const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
+  const rm={venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
+
+  document.getElementById('ed-lista').innerHTML = edAtendimentos.length ? [...edAtendimentos].reverse().map(a=>`
+    <div class="ed-item">
+      <div class="ed-item-left">
+        <div class="ed-item-em">${em[a.resultado]||'?'}</div>
+        <div>
+          <div class="ed-item-resultado ${a.resultado}">${rm[a.resultado]||a.resultado}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
+          <div class="ed-item-detalhe">${a.motivo||''}${a.categoria?' · '+a.categoria:''}</div>
+        </div>
+      </div>
+      <div class="ed-item-right">
+        <span class="ed-item-vend">${a.vendedora}</span>
+        <span class="ed-item-hora">${a.hora||''}</span>
+        <button class="btn-ed" onclick="abrirModalEditar(${a.id})">✏️ Editar</button>
+        <button class="btn-del-ed" onclick="excluirAtend(${a.id})">🗑️</button>
+      </div>
+    </div>
+  `).join('') : '<div style="color:#555;font-size:13px;text-align:center;padding:40px">Nenhum atendimento neste dia.</div>';
+}
+
+async function salvarAtendimentos() {
+  const obj = {};
+  edAtendimentos.forEach((a,i) => obj[i] = a);
+  await set(ref(db, `lojas/${edLojaId}/atendimentos/${edData}`), obj);
+}
+
+window.excluirAtend = async function(id) {
+  if (!confirm('Remover este atendimento?')) return;
+  edAtendimentos = edAtendimentos.filter(a => a.id !== id);
+  await salvarAtendimentos();
+  renderEdicao();
+}
+
+// Preencher vendedoras do seletor
+function popularVendedoras(lojaId, selId, valorAtual) {
+  const mapa = {
+    praiamar:    ['André','Izabelle','Daniele','Bianca','Mariana'],
+    miramar:     ['Letícia','Mirella','Dulce','Jéssika'],
+    azevedo:     ['Débora','Raisa','Mariela'],
+    praiagrande: ['Tainã','Karen','Dayana','Ana Lis'],
+    bioritmo:    ['Fernanda','Maria Eduarda'],
+  };
+  const sel = document.getElementById(selId);
+  const lista = mapa[lojaId] || [];
+  sel.innerHTML = lista.map(n=>`<option value="${n}" ${n===valorAtual?'selected':''}>${n}</option>`).join('');
+}
+
+window.abrirModalNovoAtend = function() {
+  edIdEditando = null;
+  document.getElementById('modal-ed-titulo').textContent = 'Novo atendimento';
+  document.getElementById('modal-ed-sub').textContent = edData + ' · ' + (document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text);
+  popularVendedoras(edLojaId, 'ed-vendedora', '');
+  document.getElementById('ed-resultado').value = 'venda';
+  document.getElementById('ed-hora').value = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('ed-valor-vendao').value = '';
+  document.getElementById('ed-diferenca').value = '';
+  document.getElementById('ed-motivo-outro').value = '';
+  toggleEdCampos();
+  document.getElementById('modal-ed').classList.add('show');
+}
+
+window.abrirModalEditar = function(id) {
+  const a = edAtendimentos.find(x=>x.id===id);
+  if (!a) return;
+  edIdEditando = id;
+  document.getElementById('modal-ed-titulo').textContent = 'Editar atendimento';
+  document.getElementById('modal-ed-sub').textContent = edData + ' · ' + (document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text);
+  popularVendedoras(edLojaId, 'ed-vendedora', a.vendedora);
+  document.getElementById('ed-resultado').value = a.resultado;
+  document.getElementById('ed-hora').value = a.hora || '';
+  document.getElementById('ed-valor-vendao').value = a.valorVendao || '';
+  document.getElementById('ed-diferenca').value = a.diferenca || '';
+  document.getElementById('ed-motivo').value = a.motivo || 'Produto não tinha na loja';
+  document.getElementById('ed-categoria').value = a.categoria || '';
+  toggleEdCampos();
+  toggleEdCategoria();
+  document.getElementById('modal-ed').classList.add('show');
+}
+
+window.fecharModalEd = function() {
+  document.getElementById('modal-ed').classList.remove('show');
+  edIdEditando = null;
+}
+
+window.toggleEdCampos = function() {
+  const res = document.getElementById('ed-resultado').value;
+  document.getElementById('ed-bloco-vendao').style.display   = res==='vendao'  ? 'block':'none';
+  document.getElementById('ed-bloco-diferenca').style.display = res==='troca_c' ? 'block':'none';
+  document.getElementById('ed-bloco-motivo').style.display   = res==='saiu'    ? 'block':'none';
+  if(res!=='saiu') document.getElementById('ed-bloco-categoria').style.display='none';
+  else toggleEdCategoria();
+}
+
+window.toggleEdCategoria = function() {
+  const mot = document.getElementById('ed-motivo').value;
+  const comCat = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+  document.getElementById('ed-bloco-categoria').style.display = comCat.includes(mot) ? 'block':'none';
+  document.getElementById('ed-motivo-outro').style.display = mot==='Outro' ? 'block':'none';
+}
+
+window.salvarEdicao = async function() {
+  const resultado = document.getElementById('ed-resultado').value;
+  const vendedora = document.getElementById('ed-vendedora').value;
+  const hora = document.getElementById('ed-hora').value;
+  let valorVendao=null, diferenca=null, motivo=null, categoria=null;
+
+  if (resultado==='vendao') {
+    const v = parseFloat(document.getElementById('ed-valor-vendao').value);
+    if (!v || v < 1000) { alert('Informe o valor do Vendão (mínimo R$1.000)'); return; }
+    valorVendao = v;
+  }
+  if (resultado==='troca_c') {
+    diferenca = parseFloat(document.getElementById('ed-diferenca').value) || null;
+  }
+  if (resultado==='saiu') {
+    motivo = document.getElementById('ed-motivo').value;
+    if (motivo==='Outro') motivo = document.getElementById('ed-motivo-outro').value.trim();
+    const comCat = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+    if (comCat.includes(document.getElementById('ed-motivo').value)) {
+      categoria = document.getElementById('ed-categoria').value || null;
+    }
+  }
+
+  if (edIdEditando) {
+    const idx = edAtendimentos.findIndex(a=>a.id===edIdEditando);
+    if (idx>=0) edAtendimentos[idx] = {...edAtendimentos[idx], resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria};
+  } else {
+    edAtendimentos.push({id:Date.now(), resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria});
+  }
+
+  await salvarAtendimentos();
+  fecharModalEd();
+  renderEdicao();
+}
 
 window.gerarPDFRanking = function() {
   const {jsPDF} = window.jspdf;
@@ -630,6 +804,19 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .empty-state{text-align:center;color:#555;font-size:13px}
 .empty-state .big{font-size:32px;margin-bottom:6px}
 #analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
+.ed-item{background:var(--ce);border:1px solid var(--cb);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.ed-item-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.ed-item-em{font-size:18px;flex-shrink:0}
+.ed-item-resultado{font-size:13px;font-weight:700}
+.ed-item-resultado.venda{color:var(--vd)}.ed-item-resultado.vendao{color:#FFD700}.ed-item-resultado.troca_s{color:var(--az)}.ed-item-resultado.troca_c{color:var(--rox)}.ed-item-resultado.saiu{color:var(--vm)}
+.ed-item-detalhe{font-size:11px;color:#888}
+.ed-item-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ed-item-vend{font-size:11px;color:#666;font-weight:600}
+.ed-item-hora{font-size:11px;color:#555}
+.btn-ed{background:rgba(59,130,246,.15);color:var(--az);border:1px solid var(--az);border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-ed:hover{background:rgba(59,130,246,.25)}
+.btn-del-ed{background:rgba(239,68,68,.15);color:var(--vm);border:1px solid var(--vm);border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-del-ed:hover{background:rgba(239,68,68,.25)}
 .atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
 .atalho-data:hover{opacity:.8}
 .ranking-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
@@ -687,6 +874,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   <div class="tab-principal ativo" onclick="trocarTabPrincipal('hoje')">📊 Hoje — Ao Vivo</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('ranking')">🏆 Ranking</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('analise')">📈 Análise Mensal</div>
+  <div class="tab-principal" onclick="trocarTabPrincipal('edicao')">✏️ Editar Registros</div>
 </div>
 
 <main>
@@ -853,6 +1041,100 @@ main{padding:24px;max-width:1100px;margin:0 auto}
       Selecione o mês e a loja, depois clique em "Buscar" para ver a análise.
     </div>
   </div>
+  <!-- VIEW EDIÇÃO -->
+  <div id="view-edicao" style="display:none">
+    <div style="margin-bottom:24px"></div>
+    <div class="am-filtros">
+      <select class="am-select" id="ed-loja">
+        <option value="">Selecione a loja...</option>
+        <option value="praiamar">Praiamar</option>
+        <option value="miramar">Miramar</option>
+        <option value="azevedo">Azevedo</option>
+        <option value="praiagrande">Praia Grande</option>
+        <option value="bioritmo">Bioritmo</option>
+      </select>
+      <input type="date" class="am-select" id="ed-data">
+      <button class="btn-am-buscar" onclick="carregarEdicao()">🔍 Buscar</button>
+    </div>
+
+    <div id="ed-loading" style="display:none;text-align:center;padding:40px;color:#666;font-size:13px">⏳ Carregando...</div>
+
+    <div id="ed-conteudo" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div id="ed-titulo" style="font-size:13px;font-weight:700;color:#aaa"></div>
+        <button class="btn-am-buscar" style="background:rgba(34,197,94,.15);color:var(--vd);border:1px solid var(--vd)" onclick="abrirModalNovoAtend()">+ Adicionar atendimento</button>
+      </div>
+      <div id="ed-lista"></div>
+    </div>
+
+    <div id="ed-hint" style="color:#555;font-size:12px;text-align:center;margin-top:16px">Selecione a loja e a data para editar os atendimentos.</div>
+  </div>
+
 </main>
+
+<!-- MODAL EDITAR ATENDIMENTO -->
+<div class="modal-overlay" id="modal-ed">
+  <div class="modal">
+    <div class="modal-titulo" id="modal-ed-titulo">Editar atendimento</div>
+    <div class="modal-sub" style="color:#888;margin-bottom:16px" id="modal-ed-sub"></div>
+
+    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Vendedora</div>
+    <select class="am-select" id="ed-vendedora" style="width:100%;margin-bottom:14px"></select>
+
+    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Resultado</div>
+    <select class="am-select" id="ed-resultado" style="width:100%;margin-bottom:14px" onchange="toggleEdCampos()">
+      <option value="venda">✅ Venda</option>
+      <option value="vendao">🏆 Vendão (+R$1.000)</option>
+      <option value="troca_s">🔄 Troca sem diferença</option>
+      <option value="troca_c">💳 Troca com diferença</option>
+      <option value="saiu">❌ Saiu sem comprar</option>
+    </select>
+
+    <div id="ed-bloco-vendao" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Valor do Vendão (R$)</div>
+      <input class="am-select" type="number" id="ed-valor-vendao" min="1000" step="0.01" placeholder="Ex: 1500.00" style="width:100%">
+    </div>
+
+    <div id="ed-bloco-diferenca" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Valor da diferença (R$)</div>
+      <input class="am-select" type="number" id="ed-diferenca" min="0" step="0.01" placeholder="Ex: 150.00" style="width:100%">
+    </div>
+
+    <div id="ed-bloco-motivo" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Motivo</div>
+      <select class="am-select" id="ed-motivo" style="width:100%" onchange="toggleEdCategoria()">
+        <option value="Produto não tinha na loja">📦 Produto não tinha na loja</option>
+        <option value="Preço alto">💰 Preço alto</option>
+        <option value="Não achou o que queria">🎨 Não achou o que queria</option>
+        <option value="Produto fora do mix LIVE!">🏷️ Produto fora do mix</option>
+        <option value="Indecisão / vai pensar">🤔 Indecisão / vai pensar</option>
+        <option value="Vai comprar no site">📱 Vai comprar no site</option>
+        <option value="Não tinha o tamanho certo">👗 Sem o tamanho certo</option>
+        <option value="Outro">✏️ Outro</option>
+      </select>
+      <input class="am-select" type="text" id="ed-motivo-outro" placeholder="Descreva o motivo..." style="width:100%;margin-top:8px;display:none">
+    </div>
+
+    <div id="ed-bloco-categoria" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Categoria de produto</div>
+      <select class="am-select" id="ed-categoria" style="width:100%">
+        <option value="">Selecione...</option>
+        <option>Bermuda</option><option>Calça/Flare</option><option>Shorts</option>
+        <option>Camiseta/Camisa/Blusa</option><option>Regata</option><option>Top</option>
+        <option>Body</option><option>Blusão/Jaqueta/Parka</option><option>Fuso/Legging</option>
+        <option>Macacão/Macacinho</option><option>Saia</option><option>Vestido</option>
+        <option>Conjunto/Cardigan</option><option>Acessório</option><option>Beach</option>
+      </select>
+    </div>
+
+    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Horário</div>
+    <input class="am-select" type="time" id="ed-hora" style="width:100%;margin-bottom:14px">
+
+    <div class="modal-acoes">
+      <button class="btn-mpdf" onclick="salvarEdicao()">💾 Salvar</button>
+    </div>
+    <button class="btn-cancel" style="margin-top:8px" onclick="fecharModalEd()">Cancelar</button>
+  </div>
+</div>
 </body>
 </html>
