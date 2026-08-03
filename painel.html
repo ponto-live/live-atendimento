@@ -166,11 +166,11 @@ function popularSeletorMes() {
 }
 
 window.trocarTabPrincipal = function(t) {
-  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||(i===3&&t==='edicao')));
+  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||));
   document.getElementById('view-hoje').style.display    = t==='hoje'    ? 'block':'none';
   document.getElementById('view-ranking').style.display = t==='ranking' ? 'block':'none';
   document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
-  document.getElementById('view-edicao').style.display  = t==='edicao'  ? 'block':'none';
+
 }
 
 async function buscarAtendimentosPeriodo(selValor, lojasParaBuscar) {
@@ -328,6 +328,9 @@ function renderAnaliseMensal(atendimentos, selMes) {
     </div>
   ` : '<div class="am-insight-title">💡 Sem dados suficientes de falta de estoque neste período ainda.</div>';
 }
+
+window.trocarTab = trocarTabPrincipal;
+
 
 window.trocarTab = trocarTabPrincipal;
 
@@ -752,6 +755,200 @@ function renderRanking(atendimentos) {
     </div>
   `).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhum vendão com valor registrado</div>';
 }
+
+// ══════════════════ EDIÇÃO DE REGISTROS ══════════════════
+const VEND_MAPA = {
+  praiamar:    ['André','Izabelle','Daniele','Bianca','Mariana'],
+  miramar:     ['Letícia','Mirella','Dulce','Jéssika'],
+  azevedo:     ['Débora','Raisa','Mariela'],
+  praiagrande: ['Tainã','Karen','Dayana','Ana Lis'],
+  bioritmo:    ['Fernanda','Maria Eduarda'],
+};
+let _edLojaId = null, _edData = null, _edList = [], _edEditIdx = null;
+
+// Inicializar data como ontem
+setTimeout(() => {
+  const ontem = new Date(); ontem.setDate(ontem.getDate()-1);
+  const el = document.getElementById('ed-data');
+  if (el) el.value = ontem.toISOString().split('T')[0];
+}, 500);
+
+// Event listeners fixos (não dependem de onclick no HTML)
+document.addEventListener('click', function(e) {
+  // Buscar
+  if (e.target.id === 'btn-ed-buscar') edBuscar();
+  // Novo atendimento
+  if (e.target.id === 'btn-novo-atend') edAbrirNovo();
+  // Editar (delegação de evento)
+  if (e.target.classList.contains('btn-editar')) {
+    const idx = parseInt(e.target.dataset.idx);
+    edAbrirEditar(idx);
+  }
+  // Excluir (delegação de evento)
+  if (e.target.classList.contains('btn-excluir-ed')) {
+    const id = e.target.dataset.id;
+    edExcluir(id);
+  }
+  // Salvar modal
+  if (e.target.id === 'btn-ed-salvar') edSalvarModal();
+  // Cancelar modal
+  if (e.target.id === 'btn-ed-cancelar') edFecharModal();
+  // Fechar clicando fora
+  if (e.target.id === 'modal-ed') edFecharModal();
+});
+
+// Campos dinâmicos do modal
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'ed-resultado') edToggleCampos();
+  if (e.target.id === 'ed-motivo') edToggleCategoria();
+});
+
+async function edBuscar() {
+  _edLojaId = document.getElementById('ed-loja').value;
+  const dataInput = document.getElementById('ed-data').value;
+  if (!_edLojaId) { alert('Selecione a loja!'); return; }
+  if (!dataInput) { alert('Selecione a data!'); return; }
+  const [ano,mes,dia] = dataInput.split('-');
+  _edData = `${dia}-${mes}-${ano}`;
+  document.getElementById('ed-loading').style.display = 'block';
+  document.getElementById('ed-conteudo').style.display = 'none';
+  document.getElementById('ed-hint').style.display = 'none';
+  try {
+    const snap = await get(ref(db, `lojas/${_edLojaId}/atendimentos/${_edData}`));
+    _edList = snap.exists() ? Object.values(snap.val()) : [];
+    edRenderLista();
+  } catch(err) { alert('Erro: ' + err.message); }
+  document.getElementById('ed-loading').style.display = 'none';
+  document.getElementById('ed-conteudo').style.display = 'block';
+}
+
+function edRenderLista() {
+  const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
+  document.getElementById('ed-titulo').textContent = `${lojaLabel} · ${_edData} · ${_edList.length} atendimentos`;
+  const em = {venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
+  const rm = {venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
+  const lista = [..._edList].reverse();
+  document.getElementById('ed-lista').innerHTML = lista.length ? lista.map((a,i) => `
+    <div class="ed-item">
+      <div class="ed-left">
+        <span style="font-size:18px">${em[a.resultado]||'?'}</span>
+        <div>
+          <div class="ed-res ${a.resultado}">${rm[a.resultado]||a.resultado}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
+          <div class="ed-det">${a.motivo||''}${a.categoria?' · '+a.categoria:''}</div>
+        </div>
+      </div>
+      <div class="ed-right">
+        <span class="ed-vend">${a.vendedora}</span>
+        <span class="ed-hora">${a.hora||''}</span>
+        <button class="btn-editar" data-idx="${i}">✏️ Editar</button>
+        <button class="btn-excluir-ed" data-id="${a.id}">🗑️</button>
+      </div>
+    </div>`).join('') : '<div style="color:#555;font-size:13px;text-align:center;padding:40px">Nenhum atendimento neste dia.</div>';
+}
+
+async function edSalvarFirebase() {
+  const obj = {};
+  _edList.forEach((a,i) => obj[i] = a);
+  await set(ref(db, `lojas/${_edLojaId}/atendimentos/${_edData}`), obj);
+}
+
+function edPopularVendedoras(valorAtual) {
+  const lista = VEND_MAPA[_edLojaId] || [];
+  const sel = document.getElementById('ed-vendedora');
+  sel.innerHTML = lista.map(n=>`<option value="${n}"${n===valorAtual?' selected':''}>${n}</option>`).join('');
+  if (valorAtual && !lista.includes(valorAtual)) {
+    sel.innerHTML += `<option value="${valorAtual}" selected>${valorAtual}</option>`;
+  }
+}
+
+function edToggleCampos() {
+  const res = document.getElementById('ed-resultado').value;
+  document.getElementById('ed-bloco-vendao').style.display    = res==='vendao'  ? 'block':'none';
+  document.getElementById('ed-bloco-diferenca').style.display = res==='troca_c' ? 'block':'none';
+  document.getElementById('ed-bloco-motivo').style.display    = res==='saiu'    ? 'block':'none';
+  if (res!=='saiu') document.getElementById('ed-bloco-categoria').style.display = 'none';
+  else edToggleCategoria();
+}
+
+function edToggleCategoria() {
+  const mot = document.getElementById('ed-motivo').value;
+  const comCat = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+  document.getElementById('ed-bloco-categoria').style.display = comCat.includes(mot) ? 'block':'none';
+  document.getElementById('ed-motivo-outro').style.display = mot==='Outro' ? 'block':'none';
+}
+
+function edAbrirModal(titulo, a) {
+  document.getElementById('ed-modal-titulo').textContent = titulo;
+  const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
+  document.getElementById('ed-modal-sub').textContent = `${_edData} · ${lojaLabel}`;
+  edPopularVendedoras(a ? a.vendedora : (VEND_MAPA[_edLojaId]||[])[0]);
+  document.getElementById('ed-resultado').value = a ? (a.resultado||'venda') : 'venda';
+  document.getElementById('ed-hora').value = a ? (a.hora||'') : new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('ed-valor-vendao').value = a ? (a.valorVendao||'') : '';
+  document.getElementById('ed-diferenca').value = a ? (a.diferenca||'') : '';
+  document.getElementById('ed-motivo').value = a ? (a.motivo||'Produto não tinha na loja') : 'Produto não tinha na loja';
+  document.getElementById('ed-categoria').value = a ? (a.categoria||'') : '';
+  document.getElementById('ed-motivo-outro').value = '';
+  edToggleCampos();
+  edToggleCategoria();
+  const modal = document.getElementById('modal-ed');
+  modal.style.display = 'flex';
+}
+
+function edAbrirNovo() {
+  _edEditIdx = null;
+  edAbrirModal('Novo atendimento', null);
+}
+
+function edAbrirEditar(idx) {
+  const lista = [..._edList].reverse();
+  const a = lista[idx];
+  if (!a) return;
+  _edEditIdx = _edList.findIndex(x => String(x.id) === String(a.id));
+  edAbrirModal('Editar atendimento', a);
+}
+
+function edFecharModal() {
+  document.getElementById('modal-ed').style.display = 'none';
+  _edEditIdx = null;
+}
+
+async function edExcluir(id) {
+  if (!confirm('Remover este atendimento?')) return;
+  _edList = _edList.filter(a => String(a.id) !== String(id));
+  await edSalvarFirebase();
+  edRenderLista();
+}
+
+async function edSalvarModal() {
+  const resultado = document.getElementById('ed-resultado').value;
+  const vendedora = document.getElementById('ed-vendedora').value;
+  const hora = document.getElementById('ed-hora').value;
+  let valorVendao=null, diferenca=null, motivo=null, categoria=null;
+  if (resultado==='vendao') {
+    valorVendao = parseFloat(document.getElementById('ed-valor-vendao').value)||null;
+    if (!valorVendao || valorVendao < 1000) { alert('Informe o valor (mín. R$1.000)'); return; }
+  }
+  if (resultado==='troca_c') diferenca = parseFloat(document.getElementById('ed-diferenca').value)||null;
+  if (resultado==='saiu') {
+    const motEl = document.getElementById('ed-motivo').value;
+    motivo = motEl==='Outro' ? document.getElementById('ed-motivo-outro').value.trim() : motEl;
+    const comCat = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
+    if (comCat.includes(motEl)) categoria = document.getElementById('ed-categoria').value||null;
+  }
+  const registro = {resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria};
+  if (_edEditIdx !== null && _edEditIdx >= 0) {
+    registro.id = _edList[_edEditIdx].id;
+    _edList[_edEditIdx] = {..._edList[_edEditIdx], ...registro};
+  } else {
+    registro.id = Date.now();
+    _edList.push(registro);
+  }
+  await edSalvarFirebase();
+  edFecharModal();
+  edRenderLista();
+}
+
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -825,19 +1022,6 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .empty-state{text-align:center;color:#555;font-size:13px}
 .empty-state .big{font-size:32px;margin-bottom:6px}
 #analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
-.ed-item{background:var(--ce);border:1px solid var(--cb);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
-.ed-item-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
-.ed-item-em{font-size:18px;flex-shrink:0}
-.ed-item-resultado{font-size:13px;font-weight:700}
-.ed-item-resultado.venda{color:var(--vd)}.ed-item-resultado.vendao{color:#FFD700}.ed-item-resultado.troca_s{color:var(--az)}.ed-item-resultado.troca_c{color:var(--rox)}.ed-item-resultado.saiu{color:var(--vm)}
-.ed-item-detalhe{font-size:11px;color:#888}
-.ed-item-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.ed-item-vend{font-size:11px;color:#666;font-weight:600}
-.ed-item-hora{font-size:11px;color:#555}
-.btn-ed{background:rgba(59,130,246,.15);color:var(--az);border:1px solid var(--az);border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
-.btn-ed:hover{background:rgba(59,130,246,.25)}
-.btn-del-ed{background:rgba(239,68,68,.15);color:var(--vm);border:1px solid var(--vm);border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
-.btn-del-ed:hover{background:rgba(239,68,68,.25)}
 .atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
 .atalho-data:hover{opacity:.8}
 .ranking-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
@@ -849,6 +1033,14 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .rank-nome{font-size:13px;font-weight:700;color:#ddd;flex:1}
 .rank-num{font-size:18px;font-weight:900;flex-shrink:0}
 .rank-de{font-size:10px;color:#555;flex-shrink:0;white-space:nowrap}
+.ed-item{background:#1A1A1A;border:1px solid #333;border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.ed-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.ed-res{font-size:12px;font-weight:700}.ed-det{font-size:11px;color:#888}
+.ed-res.venda{color:#22C55E}.ed-res.vendao{color:#FFD700}.ed-res.troca_s{color:#3B82F6}.ed-res.troca_c{color:#A855F7}.ed-res.saiu{color:#EF4444}
+.ed-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ed-vend{font-size:10px;color:#666;font-weight:600}.ed-hora{font-size:10px;color:#555}
+.btn-editar{background:rgba(59,130,246,.15);color:#3B82F6;border:1px solid #3B82F6;border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-excluir-ed{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid #EF4444;border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
 @media(max-width:600px){.atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
 .atalho-data:hover{opacity:.8}
 .ranking-grid{grid-template-columns:1fr}}
@@ -871,6 +1063,14 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .comp-cat-bar{height:14px;border-radius:4px;background:var(--am);min-width:2px;transition:width .4s}
 .comp-cat-bar.b{background:var(--rox)}
 
+.ed-item{background:#1A1A1A;border:1px solid #333;border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.ed-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.ed-res{font-size:12px;font-weight:700}.ed-det{font-size:11px;color:#888}
+.ed-res.venda{color:#22C55E}.ed-res.vendao{color:#FFD700}.ed-res.troca_s{color:#3B82F6}.ed-res.troca_c{color:#A855F7}.ed-res.saiu{color:#EF4444}
+.ed-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.ed-vend{font-size:10px;color:#666;font-weight:600}.ed-hora{font-size:10px;color:#555}
+.btn-editar{background:rgba(59,130,246,.15);color:#3B82F6;border:1px solid #3B82F6;border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-excluir-ed{background:rgba(239,68,68,.15);color:#EF4444;border:1px solid #EF4444;border-radius:6px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;font-family:'Inter',sans-serif}
 @media(max-width:600px){
   .total-grid{grid-template-columns:repeat(3,1fr)}
   .lojas-grid{grid-template-columns:1fr}
@@ -905,7 +1105,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   <div class="tab-principal ativo" onclick="trocarTabPrincipal('hoje')">📊 Hoje — Ao Vivo</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('ranking')">🏆 Ranking</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('analise')">📈 Análise Mensal</div>
-  <div class="tab-principal" onclick="trocarTabPrincipal('edicao')">✏️ Editar Registros</div>
+
 </div>
 
 <main>
@@ -1072,11 +1272,14 @@ main{padding:24px;max-width:1100px;margin:0 auto}
       Selecione o mês e a loja, depois clique em "Buscar" para ver a análise.
     </div>
   </div>
+
   <!-- VIEW EDIÇÃO -->
   <div id="view-edicao" style="display:none">
     <div style="margin-bottom:24px"></div>
-    <div class="am-filtros">
-      <select class="am-select" id="ed-loja">
+
+    <!-- Filtros -->
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <select id="ed-loja" style="background:#1A1A1A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 14px;outline:none;cursor:pointer">
         <option value="">Selecione a loja...</option>
         <option value="praiamar">Praiamar</option>
         <option value="miramar">Miramar</option>
@@ -1084,8 +1287,8 @@ main{padding:24px;max-width:1100px;margin:0 auto}
         <option value="praiagrande">Praia Grande</option>
         <option value="bioritmo">Bioritmo</option>
       </select>
-      <input type="date" class="am-select" id="ed-data">
-      <button class="btn-am-buscar" onclick="carregarEdicao()">🔍 Buscar</button>
+      <input type="date" id="ed-data" style="background:#1A1A1A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 14px;outline:none;cursor:pointer">
+      <button id="btn-ed-buscar" style="background:#F5C800;color:#0A0A0A;border:none;border-radius:8px;font-size:13px;font-weight:800;padding:10px 20px;cursor:pointer;font-family:'Inter',sans-serif">🔍 Buscar</button>
     </div>
 
     <div id="ed-loading" style="display:none;text-align:center;padding:40px;color:#666;font-size:13px">⏳ Carregando...</div>
@@ -1093,7 +1296,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
     <div id="ed-conteudo" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div id="ed-titulo" style="font-size:13px;font-weight:700;color:#aaa"></div>
-        <button class="btn-am-buscar" style="background:rgba(34,197,94,.15);color:var(--vd);border:1px solid var(--vd)" onclick="abrirModalNovoAtend()">+ Adicionar atendimento</button>
+        <button id="btn-novo-atend" style="background:rgba(34,197,94,.15);color:#22C55E;border:1px solid #22C55E;border-radius:8px;font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;font-family:'Inter',sans-serif">+ Adicionar</button>
       </div>
       <div id="ed-lista"></div>
     </div>
@@ -1102,6 +1305,69 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   </div>
 
 </main>
+
+<!-- MODAL EDITAR/NOVO ATENDIMENTO -->
+<div id="modal-ed" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#1A1A1A;border:1px solid #333;border-radius:14px;padding:26px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto">
+    <div style="font-size:18px;font-weight:800;margin-bottom:4px" id="ed-modal-titulo">Editar atendimento</div>
+    <div style="font-size:12px;color:#888;margin-bottom:20px" id="ed-modal-sub"></div>
+
+    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Vendedora</div>
+    <select id="ed-vendedora" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none;margin-bottom:14px"></select>
+
+    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Resultado</div>
+    <select id="ed-resultado" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none;margin-bottom:14px">
+      <option value="venda">✅ Venda</option>
+      <option value="vendao">🏆 Vendão (+R$1.000)</option>
+      <option value="troca_s">🔄 Troca sem diferença</option>
+      <option value="troca_c">💳 Troca com diferença</option>
+      <option value="saiu">❌ Saiu sem comprar</option>
+    </select>
+
+    <div id="ed-bloco-vendao" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Valor do Vendão (R$)</div>
+      <input id="ed-valor-vendao" type="number" min="1000" step="0.01" placeholder="Ex: 1500.00" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none">
+    </div>
+
+    <div id="ed-bloco-diferenca" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Valor da diferença (R$)</div>
+      <input id="ed-diferenca" type="number" min="0" step="0.01" placeholder="Ex: 150.00" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none">
+    </div>
+
+    <div id="ed-bloco-motivo" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Motivo</div>
+      <select id="ed-motivo" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none;margin-bottom:8px">
+        <option value="Produto não tinha na loja">📦 Produto não tinha na loja</option>
+        <option value="Preço alto">💰 Preço alto</option>
+        <option value="Não achou o que queria">🎨 Não achou o que queria</option>
+        <option value="Produto fora do mix LIVE!">🏷️ Produto fora do mix</option>
+        <option value="Indecisão / vai pensar">🤔 Indecisão / vai pensar</option>
+        <option value="Vai comprar no site">📱 Vai comprar no site</option>
+        <option value="Não tinha o tamanho certo">👗 Sem o tamanho certo</option>
+        <option value="Outro">✏️ Outro</option>
+      </select>
+      <input id="ed-motivo-outro" type="text" placeholder="Descreva o motivo..." style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none;display:none">
+    </div>
+
+    <div id="ed-bloco-categoria" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Categoria de produto</div>
+      <select id="ed-categoria" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none">
+        <option value="">Selecione...</option>
+        <option>Bermuda</option><option>Calça/Flare</option><option>Shorts</option>
+        <option>Camiseta/Camisa/Blusa</option><option>Regata</option><option>Top</option>
+        <option>Body</option><option>Blusão/Jaqueta/Parka</option><option>Fuso/Legging</option>
+        <option>Macacão/Macacinho</option><option>Saia</option><option>Vestido</option>
+        <option>Conjunto/Cardigan</option><option>Acessório</option><option>Beach</option>
+      </select>
+    </div>
+
+    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Horário</div>
+    <input id="ed-hora" type="time" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none;margin-bottom:20px">
+
+    <button id="btn-ed-salvar" style="width:100%;background:#F5C800;color:#0A0A0A;border:none;border-radius:8px;font-size:14px;font-weight:800;padding:13px;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:8px">💾 Salvar</button>
+    <button id="btn-ed-cancelar" style="width:100%;background:none;border:1px solid #444;color:#888;border-radius:8px;font-size:12px;font-weight:600;padding:10px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+  </div>
+</div>
 
 <!-- MODAL EDITAR ATENDIMENTO -->
 <div class="modal-overlay" id="modal-ed">
