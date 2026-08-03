@@ -1105,7 +1105,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   <div class="tab-principal ativo" onclick="trocarTabPrincipal('hoje')">📊 Hoje — Ao Vivo</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('ranking')">🏆 Ranking</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('analise')">📈 Análise Mensal</div>
-
+  <div class="tab-principal" onclick="trocarTabPrincipal('edicao')">✏️ Editar Registros</div>
 </div>
 
 <main>
@@ -1369,69 +1369,6 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   </div>
 </div>
 
-<!-- MODAL EDITAR ATENDIMENTO -->
-<div class="modal-overlay" id="modal-ed">
-  <div class="modal" style="max-height:85vh;overflow-y:auto">
-    <div class="modal-titulo" id="modal-ed-titulo">Editar atendimento</div>
-    <div class="modal-sub" style="color:#888;margin-bottom:16px" id="modal-ed-sub"></div>
-
-    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Vendedora</div>
-    <select class="am-select" id="ed-vendedora" style="width:100%;margin-bottom:14px"></select>
-
-    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Resultado</div>
-    <select class="am-select" id="ed-resultado" style="width:100%;margin-bottom:14px" onchange="toggleEdCampos()">
-      <option value="venda">✅ Venda</option>
-      <option value="vendao">🏆 Vendão (+R$1.000)</option>
-      <option value="troca_s">🔄 Troca sem diferença</option>
-      <option value="troca_c">💳 Troca com diferença</option>
-      <option value="saiu">❌ Saiu sem comprar</option>
-    </select>
-
-    <div id="ed-bloco-vendao" style="display:none;margin-bottom:14px">
-      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Valor do Vendão (R$)</div>
-      <input class="am-select" type="number" id="ed-valor-vendao" min="1000" step="0.01" placeholder="Ex: 1500.00" style="width:100%">
-    </div>
-
-    <div id="ed-bloco-diferenca" style="display:none;margin-bottom:14px">
-      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Valor da diferença (R$)</div>
-      <input class="am-select" type="number" id="ed-diferenca" min="0" step="0.01" placeholder="Ex: 150.00" style="width:100%">
-    </div>
-
-    <div id="ed-bloco-motivo" style="display:none;margin-bottom:14px">
-      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Motivo</div>
-      <select class="am-select" id="ed-motivo" style="width:100%" onchange="toggleEdCategoria()">
-        <option value="Produto não tinha na loja">📦 Produto não tinha na loja</option>
-        <option value="Preço alto">💰 Preço alto</option>
-        <option value="Não achou o que queria">🎨 Não achou o que queria</option>
-        <option value="Produto fora do mix LIVE!">🏷️ Produto fora do mix</option>
-        <option value="Indecisão / vai pensar">🤔 Indecisão / vai pensar</option>
-        <option value="Vai comprar no site">📱 Vai comprar no site</option>
-        <option value="Não tinha o tamanho certo">👗 Sem o tamanho certo</option>
-        <option value="Outro">✏️ Outro</option>
-      </select>
-      <input class="am-select" type="text" id="ed-motivo-outro" placeholder="Descreva o motivo..." style="width:100%;margin-top:8px;display:none">
-    </div>
-
-    <div id="ed-bloco-categoria" style="display:none;margin-bottom:14px">
-      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Categoria de produto</div>
-      <select class="am-select" id="ed-categoria" style="width:100%">
-        <option value="">Selecione...</option>
-        <option>Bermuda</option><option>Calça/Flare</option><option>Shorts</option>
-        <option>Camiseta/Camisa/Blusa</option><option>Regata</option><option>Top</option>
-        <option>Body</option><option>Blusão/Jaqueta/Parka</option><option>Fuso/Legging</option>
-        <option>Macacão/Macacinho</option><option>Saia</option><option>Vestido</option>
-        <option>Conjunto/Cardigan</option><option>Acessório</option><option>Beach</option>
-      </select>
-    </div>
-
-    <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Horário</div>
-    <input class="am-select" type="time" id="ed-hora" style="width:100%;margin-bottom:14px">
-
-    <div class="modal-acoes">
-      <button class="btn-mpdf" onclick="salvarEdicao()">💾 Salvar</button>
-    </div>
-    <button class="btn-cancel" style="margin-top:8px" onclick="fecharModalEd()">Cancelar</button>
-  </div>
-</div>
+<div id="toast">✅ Registrado!</div>
 </body>
 </html>
