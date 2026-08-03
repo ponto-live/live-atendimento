@@ -436,6 +436,7 @@ window.abrirModalNovoAtend = function() {
   document.getElementById('ed-motivo-outro').value = '';
   toggleEdCampos();
   document.getElementById('modal-ed').classList.add('show');
+  document.body.style.overflow = 'hidden';
 }
 
 window.abrirModalEditar = function(idx) {
@@ -458,10 +459,12 @@ window.abrirModalEditar = function(idx) {
   toggleEdCampos();
   toggleEdCategoria();
   document.getElementById('modal-ed').classList.add('show');
+  document.body.style.overflow = 'hidden';
 }
 
 window.fecharModalEd = function() {
   document.getElementById('modal-ed').classList.remove('show');
+  document.body.style.overflow = '';
   edIdEditando = null;
 }
 
@@ -1085,8 +1088,8 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 </main>
 
 <!-- MODAL EDITAR ATENDIMENTO -->
-<div class="modal-overlay" id="modal-ed">
-  <div class="modal">
+<div class="modal-overlay" id="modal-ed" style="position:fixed;top:0;left:0;right:0;bottom:0;overflow:hidden">
+  <div class="modal" style="position:relative;margin:auto;max-height:85vh;overflow-y:auto">
     <div class="modal-titulo" id="modal-ed-titulo">Editar atendimento</div>
     <div class="modal-sub" style="color:#888;margin-bottom:16px" id="modal-ed-sub"></div>
 
