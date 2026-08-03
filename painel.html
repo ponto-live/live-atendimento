@@ -379,7 +379,8 @@ function renderEdicao() {
   const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
   const rm={venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
 
-  document.getElementById('ed-lista').innerHTML = edAtendimentos.length ? [...edAtendimentos].reverse().map((a,_i)=>`
+  const listaRev = [...edAtendimentos].reverse();
+  document.getElementById('ed-lista').innerHTML = listaRev.length ? listaRev.map((a,_i)=>`
     <div class="ed-item">
       <div class="ed-item-left">
         <div class="ed-item-em">${em[a.resultado]||'?'}</div>
@@ -391,11 +392,19 @@ function renderEdicao() {
       <div class="ed-item-right">
         <span class="ed-item-vend">${a.vendedora}</span>
         <span class="ed-item-hora">${a.hora||''}</span>
-        <button class="btn-ed" onclick="abrirModalEditar(${_i})">✏️ Editar</button>
-        <button class="btn-del-ed" onclick="excluirAtend(${a.id})">🗑️</button>
+        <button class="btn-ed" data-idx="${_i}">✏️ Editar</button>
+        <button class="btn-del-ed" data-id="${a.id}">🗑️</button>
       </div>
     </div>
   `).join('') : '<div style="color:#555;font-size:13px;text-align:center;padding:40px">Nenhum atendimento neste dia.</div>';
+
+  // Event listeners nos botões
+  document.querySelectorAll('.btn-ed[data-idx]').forEach(btn => {
+    btn.addEventListener('click', () => abrirModalEditar(parseInt(btn.dataset.idx)));
+  });
+  document.querySelectorAll('.btn-del-ed[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => excluirAtend(btn.dataset.id));
+  });
 }
 
 async function salvarAtendimentos() {
@@ -436,7 +445,6 @@ window.abrirModalNovoAtend = function() {
   document.getElementById('ed-motivo-outro').value = '';
   toggleEdCampos();
   document.getElementById('modal-ed').classList.add('show');
-  document.body.style.overflow = 'hidden';
 }
 
 window.abrirModalEditar = function(idx) {
@@ -459,12 +467,10 @@ window.abrirModalEditar = function(idx) {
   toggleEdCampos();
   toggleEdCategoria();
   document.getElementById('modal-ed').classList.add('show');
-  document.body.style.overflow = 'hidden';
 }
 
 window.fecharModalEd = function() {
   document.getElementById('modal-ed').classList.remove('show');
-  document.body.style.overflow = '';
   edIdEditando = null;
 }
 
