@@ -272,7 +272,7 @@ function renderRegistros(){
   lista.innerHTML=[...atendimentos].reverse().map(a=>`
     <div class="hist-item">
       <div class="hist-left"><div class="hist-em">${em[a.resultado]}</div>
-        <div><div class="hist-resultado ${a.resultado}">${rm[a.resultado]}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
+        <div><div class="hist-resultado ${a.resultado}">${rm[a.resultado]}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}</div>
         <div class="hist-detalhe">${a.motivo||'—'}</div></div></div>
       <div class="hist-right"><span class="hist-vend">${a.vendedora}</span><span class="hist-hora">${a.hora}</span>
         <button class="btn-del" onclick="excluir(${a.id})">×</button></div>
