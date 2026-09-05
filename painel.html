@@ -701,7 +701,7 @@ function renderRanking(atendimentos) {
   // Agregar por vendedora
   const stats = {};
   atendimentos.forEach(a => {
-    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, total:0, totalVendao:0, maiorVendao:0};
+    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, total:0, totalVendao:0, maiorVendao:0, maiorTrocaC:0};
     const s = stats[a.vendedora];
     s.total++;
     if (a.resultado==='venda') s.venda++;
@@ -710,7 +710,10 @@ function renderRanking(atendimentos) {
       if(a.valorVendao){ s.totalVendao+=a.valorVendao; if(a.valorVendao>s.maiorVendao) s.maiorVendao=a.valorVendao; }
     }
     else if (a.resultado==='troca_s') s.troca++;
-    else if (a.resultado==='troca_c') { s.troca++; s.troca_c++; }
+    else if (a.resultado==='troca_c') {
+      s.troca++; s.troca_c++;
+      if(a.diferenca && a.diferenca>s.maiorTrocaC) s.maiorTrocaC=a.diferenca;
+    }
     else if (a.resultado==='saiu') s.saiu++;
   });
 
@@ -740,6 +743,20 @@ function renderRanking(atendimentos) {
   document.getElementById('rank-troca').innerHTML    = renderLista(vendedoras,'troca','#3B82F6');
   document.getElementById('rank-troca-c').innerHTML  = renderLista(vendedoras,'troca_c','#A855F7');
   document.getElementById('rank-saiu').innerHTML     = renderLista(vendedoras,'saiu','#EF4444');
+
+  // Ranking maior troca com diferença por valor
+  const comTrocaC = vendedoras.filter(([,v])=>v.maiorTrocaC>0).sort((a,b)=>b[1].maiorTrocaC-a[1].maiorTrocaC);
+  const medalhasTroca = ['🥇','🥈','🥉'];
+  document.getElementById('rank-maior-troca-c').innerHTML = comTrocaC.length ? comTrocaC.map(([nome,v],i)=>`
+    <div class="rank-row">
+      <span class="rank-pos">${medalhasTroca[i]||i+1+'º'}</span>
+      <span class="rank-nome">${nome}</span>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="rank-num" style="color:#A855F7;font-size:14px">R$${v.maiorTrocaC.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+        <div style="font-size:9px;color:#666">${v.troca_c} troca(s) c/ dif.</div>
+      </div>
+    </div>
+  `).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhuma troca com diferença registrada</div>';
 
   // Ranking de maior vendão por valor
   const comVendao = vendedoras.filter(([,v])=>v.maiorVendao>0).sort((a,b)=>b[1].maiorVendao-a[1].maiorVendao);
@@ -1200,6 +1217,10 @@ main{padding:24px;max-width:1100px;margin:0 auto}
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:#FFD700">🏆 Maior Vendão do Período</div>
           <div id="rank-maior-vendao"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:#A855F7">💳 Maior Troca com Diferença</div>
+          <div id="rank-maior-troca-c"></div>
         </div>
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:var(--vm)">❌ Mais Sem Venda</div>
