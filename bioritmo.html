@@ -369,21 +369,42 @@ window.gerarPDF = function(){
 
 // ══ WHATSAPP ══
 window.enviarWpp = function(idx){
-  const agora=new Date();const ds=agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
-  const total=atendimentos.length,vendas=atendimentos.filter(a=>a.resultado==='venda').length;
+  const agora=new Date();
+  const ds=agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  const total=atendimentos.length;
+  const vendas=atendimentos.filter(a=>a.resultado==='venda').length;
   const vendoes=atendimentos.filter(a=>a.resultado==='vendao').length;
   const trocas=atendimentos.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
   const saiu=atendimentos.filter(a=>a.resultado==='saiu').length;
   const conv=total>0?Math.round(((vendas+vendoes)/total)*100):0;
-  const mots={};atendimentos.filter(a=>a.resultado==='saiu').forEach(a=>{if(a.motivo)mots[a.motivo]=(mots[a.motivo]||0)+1;});
-  const mo=Object.entries(mots).sort((a,b)=>b[1]-a[1]);
-  const texto=`📊 *LIVE! ${LOJA_NOME}*\n📅 ${ds} · ⏰ ${hora()}\n\n✅ Vendas: *${vendas}*\n🏆 Vendões: *${vendoes}*\n🔄 Trocas: *${trocas}*\n❌ Sem venda: *${saiu}*\n📈 Conversão: *${conv}%*\n👥 Total: *${total} atendimentos*${mo.length?'\n\n🔍 *Motivos de não-venda:*\n'+mo.map(([m,n])=>`  • ${m}: ${n}x`).join('\n'):''}\n\n_Relatório via LIVE! Atendimento_`;
+
+  let texto=`📊 *LIVE! ${LOJA_NOME}*\n📅 ${ds} · ⏰ ${hora()}\n\n`;
+  texto+=`✅ Vendas: *${vendas}* | 🏆 Vendões: *${vendoes}*\n`;
+  texto+=`🔄 Trocas: *${trocas}* | ❌ Sem venda: *${saiu}*\n`;
+  texto+=`📈 Conversão: *${conv}%* | 👥 Total: *${total}*\n`;
+
+  const porVend={};
+  atendimentos.forEach(a=>{
+    if(!porVend[a.vendedora])porVend[a.vendedora]={venda:0,vendao:0,troca:0,saiu:0,total:0,motivos:{}};
+    const v=porVend[a.vendedora];v.total++;
+    if(a.resultado==='venda')v.venda++;
+    else if(a.resultado==='vendao')v.vendao++;
+    else if(a.resultado==='troca_s'||a.resultado==='troca_c')v.troca++;
+    else if(a.resultado==='saiu'){v.saiu++;if(a.motivo)v.motivos[a.motivo]=(v.motivos[a.motivo]||0)+1;}
+  });
+  const vends=Object.entries(porVend).sort((a,b)=>b[1].total-a[1].total);
+  if(vends.length){
+    texto+=`\n━━━━━━━━━━━━━━━\n👤 *POR VENDEDORA*\n━━━━━━━━━━━━━━━\n`;
+    vends.forEach(([nome,v])=>{
+      texto+=`\n*${nome}*\n`;
+      texto+=`✅${v.venda} 🏆${v.vendao} 🔄${v.troca} ❌${v.saiu} · ${v.total} atend.\n`;
+      const mots=Object.entries(v.motivos).sort((a,b)=>b[1]-a[1]);
+      mots.forEach(([m,n])=>{texto+=`  • ${m}: ${n}x\n`;});
+    });
+  }
+  texto+=`\n_Relatório via LIVE! Atendimento_`;
   window.open('https://wa.me/'+WPP[idx]+'?text='+encodeURIComponent(texto),'_blank');
 }
-
-// ══ PREFERÊNCIA ══
-let prefSolicitante = null;
-
 window.abrirModalPref = function(i) {
   prefSolicitante = i;
   // Lista TODAS as vendedoras exceto quem está em casa e a própria
