@@ -346,7 +346,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // Mapa fixo de vendedoras por loja
 const VENDEDORAS_MAPA = {
   praiamar:    ['André','Izabelle','Daniele','Bianca','Mariana'],
-  miramar:     ['Nayara','Mirella','Dulce','Jéssika'],
+  miramar:     ['Nayara','Mirella','Jéssika'],
   azevedo:     ['Débora','Raisa','Mariela'],
   praiagrande: ['Tainã','Karen','Dayana','Ana Lis'],
   bioritmo:    ['Fernanda','Maria Eduarda'],
@@ -639,10 +639,16 @@ window.setSemanaAtual = function() {
 
 async function buscarAtendimentosPorDatas(dataIni, dataFim, lojasParaBuscar) {
   let atendimentos = [];
-  const ini = new Date(dataIni + 'T00:00:00');
-  const fim = new Date(dataFim + 'T23:59:59');
+  // Construir datas manualmente para evitar problema de timezone
+  const [anoIni, mesIni, diaIni] = dataIni.split('-').map(Number);
+  const [anoFim, mesFim, diaFim] = dataFim.split('-').map(Number);
+  const ini = new Date(anoIni, mesIni-1, diaIni);
+  const fim = new Date(anoFim, mesFim-1, diaFim);
   for (let d = new Date(ini); d <= fim; d.setDate(d.getDate()+1)) {
-    const dataStr = d.toLocaleDateString('pt-BR').replace(/\//g,'-');
+    const dia = String(d.getDate()).padStart(2,'0');
+    const mes = String(d.getMonth()+1).padStart(2,'0');
+    const ano = d.getFullYear();
+    const dataStr = `${dia}-${mes}-${ano}`;
     for (const lojaId of lojasParaBuscar) {
       try {
         const snap = await get(ref(db, `lojas/${lojaId}/atendimentos/${dataStr}`));
@@ -776,7 +782,7 @@ function renderRanking(atendimentos) {
 // ══════════════════ EDIÇÃO DE REGISTROS ══════════════════
 const VEND_MAPA = {
   praiamar:    ['André','Izabelle','Daniele','Bianca','Mariana'],
-  miramar:     ['Nayara','Mirella','Dulce','Jéssika'],
+  miramar:     ['Nayara','Mirella','Jéssika'],
   azevedo:     ['Débora','Raisa','Mariela'],
   praiagrande: ['Tainã','Karen','Dayana','Ana Lis'],
   bioritmo:    ['Fernanda','Maria Eduarda'],
