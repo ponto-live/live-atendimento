@@ -385,21 +385,34 @@ window.enviarWpp = function(idx){
 
   const porVend={};
   atendimentos.forEach(a=>{
-    if(!porVend[a.vendedora])porVend[a.vendedora]={venda:0,vendao:0,troca:0,saiu:0,total:0,motivos:{}};
+    if(!porVend[a.vendedora])porVend[a.vendedora]={venda:0,vendao:0,troca:0,saiu:0,total:0,motivos:{},lista:[]};
     const v=porVend[a.vendedora];v.total++;
-    if(a.resultado==='venda')v.venda++;
-    else if(a.resultado==='vendao')v.vendao++;
-    else if(a.resultado==='troca_s'||a.resultado==='troca_c')v.troca++;
-    else if(a.resultado==='saiu'){v.saiu++;if(a.motivo)v.motivos[a.motivo]=(v.motivos[a.motivo]||0)+1;}
+    if(a.resultado==='venda'){v.venda++;v.lista.push({hora:a.hora,tipo:'Venda'});}
+    else if(a.resultado==='vendao'){v.vendao++;v.lista.push({hora:a.hora,tipo:'Vendão'});}
+    else if(a.resultado==='troca_s'){v.troca++;v.lista.push({hora:a.hora,tipo:'Troca sem diferença'});}
+    else if(a.resultado==='troca_c'){v.troca++;v.lista.push({hora:a.hora,tipo:'Troca com diferença'+(a.diferenca?' R$'+Number(a.diferenca).toFixed(2):'')});}
+    else if(a.resultado==='saiu'){
+      v.saiu++;
+      v.lista.push({hora:a.hora,tipo:'Sem venda'+(a.motivo?' - '+a.motivo:'')});
+      if(a.motivo)v.motivos[a.motivo]=(v.motivos[a.motivo]||0)+1;
+    }
   });
+
   const vends=Object.entries(porVend).sort((a,b)=>b[1].total-a[1].total);
   if(vends.length){
     texto+=`\n-------------------\n👤 *POR VENDEDORA*\n-------------------\n`;
     vends.forEach(([nome,v])=>{
       texto+=`\n*${nome}*\n`;
       texto+=`Vendas: ${v.venda} | Vendões: ${v.vendao} | Trocas: ${v.troca} | Sem venda: ${v.saiu} | Total: ${v.total}\n`;
+      // Lista por horário
+      const listaOrdenada = v.lista.sort((a,b)=>a.hora>b.hora?1:-1);
+      listaOrdenada.forEach(l=>{texto+=`  ${l.hora} ${l.tipo}\n`;});
+      // Motivos resumidos
       const mots=Object.entries(v.motivos).sort((a,b)=>b[1]-a[1]);
-      mots.forEach(([m,n])=>{texto+=`  • ${m}: ${n}x\n`;});
+      if(mots.length){
+        texto+=`  Motivos: `;
+        texto+=mots.map(([m,n])=>`${m} (${n}x)`).join(', ')+'\n';
+      }
     });
   }
   texto+=`\n_Relatório via LIVE! Atendimento_`;
