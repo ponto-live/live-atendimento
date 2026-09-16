@@ -407,12 +407,7 @@ window.enviarWpp = function(idx){
       // Lista por horário
       const listaOrdenada = v.lista.sort((a,b)=>a.hora>b.hora?1:-1);
       listaOrdenada.forEach(l=>{texto+=`  ${l.hora} ${l.tipo}\n`;});
-      // Motivos resumidos
-      const mots=Object.entries(v.motivos).sort((a,b)=>b[1]-a[1]);
-      if(mots.length){
-        texto+=`  Motivos: `;
-        texto+=mots.map(([m,n])=>`${m} (${n}x)`).join(', ')+'\n';
-      }
+
     });
   }
   texto+=`\n_Relatório via LIVE! Atendimento_`;
