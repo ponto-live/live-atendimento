@@ -28,7 +28,7 @@ const LOJA_NOME = 'Azevedo Sodré';
 const LOJA_TAG  = 'Azevedo';
 const Azevedo    = 'Azevedo';
 const WPP = ['5513988301987','5511968122327'];
-const VENDEDORAS_INICIAIS = ["Débora", "Raisa", "Mariela"];
+const VENDEDORAS_INICIAIS = ["Débora", "Raisa", "Mariela", "Rafaela"];
 
 // ══ ESTADO ══
 let fila = [], atendimentos = [], vReg = null, resSel = null, motSel = null, prefSolicitante = null;
@@ -398,7 +398,12 @@ window.enviarWpp = function(idx){
     }
   });
 
-  const vends=Object.entries(porVend).sort((a,b)=>b[1].total-a[1].total);
+  // Ordenar por horário do primeiro atendimento
+  const vends=Object.entries(porVend).sort((a,b)=>{
+    const primeiroA = a[1].lista.length ? a[1].lista[0].hora : '99:99';
+    const primeiroB = b[1].lista.length ? b[1].lista[0].hora : '99:99';
+    return primeiroA > primeiroB ? 1 : -1;
+  });
   if(vends.length){
     texto+=`\n-------------------\n👤 *POR VENDEDORA*\n-------------------\n`;
     vends.forEach(([nome,v])=>{
