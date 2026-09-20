@@ -398,7 +398,12 @@ window.enviarWpp = function(idx){
     }
   });
 
-  const vends=Object.entries(porVend).sort((a,b)=>b[1].total-a[1].total);
+  // Ordenar por horário do primeiro atendimento
+  const vends=Object.entries(porVend).sort((a,b)=>{
+    const primeiroA = a[1].lista.length ? a[1].lista[0].hora : '99:99';
+    const primeiroB = b[1].lista.length ? b[1].lista[0].hora : '99:99';
+    return primeiroA > primeiroB ? 1 : -1;
+  });
   if(vends.length){
     texto+=`\n-------------------\n👤 *POR VENDEDORA*\n-------------------\n`;
     vends.forEach(([nome,v])=>{
