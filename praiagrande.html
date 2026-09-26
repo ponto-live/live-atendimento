@@ -152,11 +152,11 @@ function renderFila() {
     }else if(alm){
       ac=`<button class="btn-a btn-volta" onclick="voltarAlmoco(${i})">✅ Voltei!</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else if(atend){
-      ac=`<button class="btn-a btn-reg" onclick="abrirModalReg(${i})">📝 Registrar</button><button class="btn-a btn-pref" onclick="abrirModalPref(${i})">💜 Preferência</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
+      ac=`<button class="btn-a btn-reg" onclick="abrirModalReg(${i})">📝 Registrar</button><button class="btn-a btn-pref" onclick="abrirModalPref(${i})">💜 Preferência</button><button class="btn-a btn-wpp" onclick="abrirModalWpp(${i})">📱 WhatsApp</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else if(isVez){
-      ac=`<button class="btn-a btn-atender" onclick="iniciarAtendimento(${i})">▶ Em atendimento</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
+      ac=`<button class="btn-a btn-atender" onclick="iniciarAtendimento(${i})">▶ Em atendimento</button><button class="btn-a btn-wpp" onclick="abrirModalWpp(${i})">📱 WhatsApp</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }else{
-      ac=`<button class="btn-a btn-pref" onclick="abrirModalPref(${i})">💜 Preferência</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
+      ac=`<button class="btn-a btn-pref" onclick="abrirModalPref(${i})">💜 Preferência</button><button class="btn-a btn-wpp" onclick="abrirModalWpp(${i})">📱 WhatsApp</button><button class="btn-a btn-almoco" onclick="irAlmoco(${i})">🍽️ Almoço</button><button class="btn-a btn-casa" onclick="irCasa(${i})">🏠 Casa</button>`;
     }
     return `<div class="${cc}"><div class="${bc}">${bt}</div><div style="flex:1;min-width:0"><div class="v-nome">${v.nome}</div><div class="v-status ${sc}">${st}</div></div><div class="card-acoes">${ac}</div></div>`;
   }).join('');
@@ -187,6 +187,30 @@ window.abrirModalReg = function(i) {
   document.getElementById('modal-reg').classList.add('show');
 }
 window.fecharModalReg = function(){ document.getElementById('modal-reg').classList.remove('show'); vReg=null; }
+
+// ══ VENDA WHATSAPP (não mexe na fila) ══
+let wppNome = null;
+window.abrirModalWpp = function(i){
+  wppNome = fila[i].nome;
+  document.getElementById('modal-wpp-nome').textContent = wppNome;
+  document.getElementById('input-valor-wpp').value = '';
+  document.getElementById('btn-confirmar-wpp').disabled = true;
+  document.getElementById('modal-wpp').classList.add('show');
+  setTimeout(()=>document.getElementById('input-valor-wpp').focus(), 100);
+}
+window.fecharModalWpp = function(){ document.getElementById('modal-wpp').classList.remove('show'); wppNome = null; }
+window.atualizaBtnWpp = function(){
+  const v = parseFloat(document.getElementById('input-valor-wpp').value);
+  document.getElementById('btn-confirmar-wpp').disabled = !(v > 0);
+}
+window.confirmarWpp = async function(){
+  const v = parseFloat(document.getElementById('input-valor-wpp').value);
+  if (!wppNome || !(v > 0)) return;
+  atendimentos.push({id:Date.now(),resultado:'whatsapp',motivo:null,categoria:null,diferenca:null,valorVendao:null,valorWhatsapp:v,vendedora:wppNome,hora:hora()});
+  await salvarAtend();
+  fecharModalWpp();
+  mostrarToast('📱 Venda WhatsApp registrada!');
+}
 
 window.selRes = function(tipo){
   resSel=tipo; motSel=null;
@@ -252,27 +276,29 @@ window.confirmar = async function(){
 
 // ══ REGISTROS ══
 function renderRegistros(){
-  const total=atendimentos.length;
+  const total=atendimentos.filter(a=>a.resultado!=='whatsapp').length;
   const vendas=atendimentos.filter(a=>a.resultado==='venda').length;
   const vendoes=atendimentos.filter(a=>a.resultado==='vendao').length;
   const trocas=atendimentos.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
   const saiu=atendimentos.filter(a=>a.resultado==='saiu').length;
+  const wpps=atendimentos.filter(a=>a.resultado==='whatsapp'), wppQtd=wpps.length, wppValor=wpps.reduce((s,a)=>s+(Number(a.valorWhatsapp)||0),0);
   const conv=total>0?Math.round(((vendas+vendoes)/total)*100):0;
   document.getElementById('cnt-total').textContent=total;
   document.getElementById('cnt-venda').textContent=vendas;
   document.getElementById('cnt-vendao').textContent=vendoes;
+  document.getElementById('cnt-wpp').textContent=wppQtd;
   document.getElementById('cnt-troca').textContent=trocas;
   document.getElementById('cnt-saiu').textContent=saiu;
   document.getElementById('pct-conv').textContent=total>0?conv+'%':'—';
   document.getElementById('bar-conv').style.width=conv+'%';
   const lista=document.getElementById('hist-lista');
   if(!atendimentos.length){lista.innerHTML='<div class="empty-state"><div class="big">📋</div>Nenhum atendimento ainda.</div>';return;}
-  const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
-  const rm={venda:'Venda',vendao:'Vendão (+R$1.000)',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
+  const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌',whatsapp:'📱'};
+  const rm={venda:'Venda',vendao:'Vendão (+R$1.000)',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar',whatsapp:'Venda WhatsApp'};
   lista.innerHTML=[...atendimentos].reverse().map(a=>`
     <div class="hist-item">
       <div class="hist-left"><div class="hist-em">${em[a.resultado]}</div>
-        <div><div class="hist-resultado ${a.resultado}">${rm[a.resultado]}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}</div>
+        <div><div class="hist-resultado ${a.resultado}">${rm[a.resultado]}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.valorWhatsapp!=null?' · R$'+Number(a.valorWhatsapp).toFixed(2):''}</div>
         <div class="hist-detalhe">${a.motivo||'—'}</div></div></div>
       <div class="hist-right"><span class="hist-vend">${a.vendedora}</span><span class="hist-hora">${a.hora}</span>
         <button class="btn-del" onclick="excluir(${a.id})">×</button></div>
@@ -290,15 +316,17 @@ window.abrirModalFechar = function(){
   const agora=new Date();
   const ds=agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   document.getElementById('modal-data-hora').textContent=ds+' · '+hora();
-  const total=atendimentos.length,vendas=atendimentos.filter(a=>a.resultado==='venda').length;
+  const total=atendimentos.filter(a=>a.resultado!=='whatsapp').length,vendas=atendimentos.filter(a=>a.resultado==='venda').length;
   const vendoes=atendimentos.filter(a=>a.resultado==='vendao').length;
   const trocas=atendimentos.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
   const saiu=atendimentos.filter(a=>a.resultado==='saiu').length;
+  const wpps=atendimentos.filter(a=>a.resultado==='whatsapp'), wppQtd=wpps.length, wppValor=wpps.reduce((s,a)=>s+(Number(a.valorWhatsapp)||0),0);
   const conv=total>0?Math.round(((vendas+vendoes)/total)*100):0;
   document.getElementById('modal-resumo').innerHTML=`
     <div class="modal-item"><div class="modal-num" style="color:var(--am)">${total}</div><div class="modal-lbl">Total</div></div>
     <div class="modal-item"><div class="modal-num" style="color:var(--vd)">${vendas}</div><div class="modal-lbl">Vendas</div></div>
     <div class="modal-item"><div class="modal-num" style="color:#FFD700">${vendoes}</div><div class="modal-lbl">Vendões</div></div>
+    <div class="modal-item"><div class="modal-num" style="color:#25D366">${wppQtd}</div><div class="modal-lbl">WhatsApp · R$${wppValor.toFixed(2)}</div></div>
     <div class="modal-item"><div class="modal-num" style="color:var(--az)">${trocas}</div><div class="modal-lbl">Trocas</div></div>
     <div class="modal-item"><div class="modal-num" style="color:var(--am)">${conv}%</div><div class="modal-lbl">Conversão</div></div>
     <div class="modal-item"><div class="modal-num" style="color:var(--vm)">${saiu}</div><div class="modal-lbl">Sem venda</div></div>`;
@@ -306,8 +334,9 @@ window.abrirModalFechar = function(){
   // Resumo por vendedora
   const porVendedora = {};
   atendimentos.forEach(a => {
-    if(!porVendedora[a.vendedora]) porVendedora[a.vendedora] = {venda:0,vendao:0,troca:0,saiu:0,total:0};
+    if(!porVendedora[a.vendedora]) porVendedora[a.vendedora] = {venda:0,vendao:0,troca:0,saiu:0,total:0,wpp:0};
     const v = porVendedora[a.vendedora];
+    if(a.resultado==='whatsapp'){v.wpp++;return;}
     v.total++;
     if(a.resultado==='venda') v.venda++;
     else if(a.resultado==='vendao') v.vendao++;
@@ -323,6 +352,7 @@ window.abrirModalFechar = function(){
         <div class="vend-stats">
           <span class="vend-stat vd" title="Vendas">✅${v.venda}</span>
           ${v.vendao>0?`<span class="vend-stat am" title="Vendões">🏆${v.vendao}</span>`:''}
+          ${v.wpp>0?`<span class="vend-stat wp" title="WhatsApp">📱${v.wpp}</span>`:''}
           ${v.troca>0?`<span class="vend-stat az" title="Trocas">🔄${v.troca}</span>`:''}
           ${v.saiu>0?`<span class="vend-stat vm" title="Sem venda">❌${v.saiu}</span>`:''}
           <span class="vend-total">${v.total} total</span>
@@ -344,24 +374,25 @@ window.gerarPDF = function(){
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const agora=new Date();
   const ds=agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),hs=hora();
-  const total=atendimentos.length,vendas=atendimentos.filter(a=>a.resultado==='venda').length;
+  const total=atendimentos.filter(a=>a.resultado!=='whatsapp').length,vendas=atendimentos.filter(a=>a.resultado==='venda').length;
   const vendoes=atendimentos.filter(a=>a.resultado==='vendao').length;
   const trocas=atendimentos.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
   const saiu=atendimentos.filter(a=>a.resultado==='saiu').length;
+  const wpps=atendimentos.filter(a=>a.resultado==='whatsapp'), wppQtd=wpps.length, wppValor=wpps.reduce((s,a)=>s+(Number(a.valorWhatsapp)||0),0);
   const conv=total>0?Math.round(((vendas+vendoes)/total)*100):0;
   doc.setFillColor(10,10,10);doc.rect(0,0,210,297,'F');
   doc.setFillColor(245,200,0);doc.rect(0,0,210,22,'F');
   doc.setTextColor(10,10,10);doc.setFontSize(18);doc.setFont('helvetica','bold');doc.text('LIVE!',14,14);
   doc.setFontSize(10);doc.text(LOJA_NOME,50,10);doc.setFont('helvetica','normal');doc.text('Relatório de Atendimento · '+ds,50,16);
   doc.setFontSize(9);doc.text('Gerado às '+hs,165,14);
-  const cards=[{l:'Total',v:total,c:[245,200,0]},{l:'Vendas',v:vendas,c:[34,197,94]},{l:'Vendões',v:vendoes,c:[255,215,0]},{l:'Trocas',v:trocas,c:[59,130,246]},{l:'Sem venda',v:saiu,c:[239,68,68]}];
-  let cx=11;cards.forEach(c=>{doc.setFillColor(26,26,26);doc.roundedRect(cx,28,36,20,3,3,'F');doc.setFillColor(...c.c);doc.roundedRect(cx,28,36,2,1,1,'F');doc.setTextColor(...c.c);doc.setFontSize(16);doc.setFont('helvetica','bold');doc.text(String(c.v),cx+18,39,{align:'center'});doc.setTextColor(140,140,140);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(c.l,cx+18,44,{align:'center'});cx+=38;});
+  const cards=[{l:'Total',v:total,c:[245,200,0]},{l:'Vendas',v:vendas,c:[34,197,94]},{l:'Vendões',v:vendoes,c:[255,215,0]},{l:'WhatsApp',v:wppQtd,c:[37,211,102]},{l:'Trocas',v:trocas,c:[59,130,246]},{l:'Sem venda',v:saiu,c:[239,68,68]}];
+  let cx=11;cards.forEach(c=>{doc.setFillColor(26,26,26);doc.roundedRect(cx,28,29.5,20,3,3,'F');doc.setFillColor(...c.c);doc.roundedRect(cx,28,29.5,2,1,1,'F');doc.setTextColor(...c.c);doc.setFontSize(16);doc.setFont('helvetica','bold');doc.text(String(c.v),cx+14.75,39,{align:'center'});doc.setTextColor(140,140,140);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(c.l,cx+14.75,44,{align:'center'});cx+=31.7;});
   doc.setFillColor(26,26,26);doc.roundedRect(11,54,188,12,3,3,'F');doc.setTextColor(245,200,0);doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('Conversão: '+conv+'%',15,61);doc.setFillColor(40,40,40);doc.roundedRect(75,57,118,4,2,2,'F');if(conv>0){doc.setFillColor(245,200,0);doc.roundedRect(75,57,Math.min(conv*1.18,118),4,2,2,'F');}
   doc.setTextColor(120,120,120);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('ATENDIMENTOS',11,74);
   doc.setFillColor(26,26,26);doc.rect(11,77,188,7,'F');doc.setTextColor(150,150,150);doc.setFontSize(7);doc.text('HORA',14,81);doc.text('VENDEDORA',34,81);doc.text('RESULTADO',75,81);doc.text('MOTIVO / DETALHE',125,81);
-  const rm={venda:'Venda',vendao:'Vendão (+R$1.000)',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
-  const cm={venda:[34,197,94],vendao:[255,215,0],troca_s:[59,130,246],troca_c:[168,85,247],saiu:[239,68,68]};
-  let y=88;atendimentos.forEach((a,i)=>{if(y>272){doc.addPage();y=20;doc.setFillColor(10,10,10);doc.rect(0,0,210,297,'F');}if(i%2===0){doc.setFillColor(20,20,20);doc.rect(11,y-3,188,7,'F');}doc.setFont('helvetica','normal');doc.setTextColor(185,185,185);doc.setFontSize(7);doc.text(a.hora,14,y);doc.text(a.vendedora,34,y);doc.setTextColor(...cm[a.resultado]);doc.text(rm[a.resultado],75,y);doc.setTextColor(165,165,165);let det=a.motivo||'';if(a.diferenca!=null)det='R$'+Number(a.diferenca).toFixed(2);if(det.length>42)det=det.substring(0,39)+'...';doc.text(det,125,y);y+=7;});
+  const rm={venda:'Venda',vendao:'Vendão (+R$1.000)',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar',whatsapp:'Venda WhatsApp'};
+  const cm={venda:[34,197,94],vendao:[255,215,0],troca_s:[59,130,246],troca_c:[168,85,247],saiu:[239,68,68],whatsapp:[37,211,102]};
+  let y=88;atendimentos.forEach((a,i)=>{if(y>272){doc.addPage();y=20;doc.setFillColor(10,10,10);doc.rect(0,0,210,297,'F');}if(i%2===0){doc.setFillColor(20,20,20);doc.rect(11,y-3,188,7,'F');}doc.setFont('helvetica','normal');doc.setTextColor(185,185,185);doc.setFontSize(7);doc.text(a.hora,14,y);doc.text(a.vendedora,34,y);doc.setTextColor(...cm[a.resultado]);doc.text(rm[a.resultado],75,y);doc.setTextColor(165,165,165);let det=a.motivo||'';if(a.diferenca!=null)det='R$'+Number(a.diferenca).toFixed(2);if(a.valorVendao!=null)det='R$'+Number(a.valorVendao).toFixed(2);if(a.valorWhatsapp!=null)det='R$'+Number(a.valorWhatsapp).toFixed(2);if(det.length>42)det=det.substring(0,39)+'...';doc.text(det,125,y);y+=7;});
   const mots={};atendimentos.filter(a=>a.resultado==='saiu').forEach(a=>{if(a.motivo)mots[a.motivo]=(mots[a.motivo]||0)+1;});const mo=Object.entries(mots).sort((a,b)=>b[1]-a[1]);if(mo.length){y+=6;doc.setTextColor(120,120,120);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('MOTIVOS DE NÃO-VENDA',11,y);y+=7;mo.forEach(([m,n])=>{doc.setFillColor(26,26,26);doc.rect(11,y-3,188,7,'F');doc.setFont('helvetica','normal');doc.setTextColor(185,185,185);doc.setFontSize(7);doc.text(m,15,y);doc.setTextColor(249,115,22);doc.setFont('helvetica','bold');doc.text(n+'x',196,y,{align:'right'});y+=7;});}
   doc.setFillColor(245,200,0);doc.rect(0,287,210,10,'F');doc.setTextColor(10,10,10);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('LIVE! '+LOJA_NOME+' · '+ds+' · '+hs,105,293,{align:'center'});
   const pdfBlob=doc.output('blob');const blobUrl=URL.createObjectURL(pdfBlob);const link=document.createElement('a');link.href=blobUrl;link.download='LIVE_Atendimento_'+PraiaGrande+'_'+dataHoje()+'.pdf';link.target='_blank';document.body.appendChild(link);link.click();setTimeout(()=>{document.body.removeChild(link);URL.revokeObjectURL(blobUrl);},1000);
@@ -371,22 +402,26 @@ window.gerarPDF = function(){
 window.enviarWpp = function(idx){
   const agora=new Date();
   const ds=agora.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
-  const total=atendimentos.length;
+  const total=atendimentos.filter(a=>a.resultado!=='whatsapp').length;
   const vendas=atendimentos.filter(a=>a.resultado==='venda').length;
   const vendoes=atendimentos.filter(a=>a.resultado==='vendao').length;
   const trocas=atendimentos.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
   const saiu=atendimentos.filter(a=>a.resultado==='saiu').length;
+  const wpps=atendimentos.filter(a=>a.resultado==='whatsapp'), wppQtd=wpps.length, wppValor=wpps.reduce((s,a)=>s+(Number(a.valorWhatsapp)||0),0);
   const conv=total>0?Math.round(((vendas+vendoes)/total)*100):0;
 
   let texto=`📊 *LIVE! ${LOJA_NOME}*\n📅 ${ds} · ⏰ ${hora()}\n\n`;
   texto+=`Vendas: *${vendas}* | Vendões: *${vendoes}*\n`;
+  texto+=`📱 WhatsApp: *${wppQtd}* (R$ ${wppValor.toFixed(2)})\n`;
   texto+=`Trocas: *${trocas}* | Sem venda: *${saiu}*\n`;
   texto+=`Conversão: *${conv}%* | Total: *${total} atend.*\n`;
 
   const porVend={};
   atendimentos.forEach(a=>{
-    if(!porVend[a.vendedora])porVend[a.vendedora]={venda:0,vendao:0,troca:0,saiu:0,total:0,motivos:{},lista:[]};
-    const v=porVend[a.vendedora];v.total++;
+    if(!porVend[a.vendedora])porVend[a.vendedora]={venda:0,vendao:0,troca:0,saiu:0,total:0,wpp:0,wppValor:0,motivos:{},lista:[]};
+    const v=porVend[a.vendedora];
+    if(a.resultado==='whatsapp'){v.wpp++;v.wppValor+=Number(a.valorWhatsapp)||0;v.lista.push({hora:a.hora,tipo:'📱 Venda WhatsApp R$'+Number(a.valorWhatsapp).toFixed(2)});return;}
+    v.total++;
     if(a.resultado==='venda'){v.venda++;v.lista.push({hora:a.hora,tipo:'Venda'});}
     else if(a.resultado==='vendao'){v.vendao++;v.lista.push({hora:a.hora,tipo:'Vendão'});}
     else if(a.resultado==='troca_s'){v.troca++;v.lista.push({hora:a.hora,tipo:'Troca sem diferença'});}
@@ -403,7 +438,7 @@ window.enviarWpp = function(idx){
     texto+=`\n-------------------\n👤 *POR VENDEDORA*\n-------------------\n`;
     vends.forEach(([nome,v])=>{
       texto+=`\n*${nome}*\n`;
-      texto+=`Vendas: ${v.venda} | Vendões: ${v.vendao} | Trocas: ${v.troca} | Sem venda: ${v.saiu} | Total: ${v.total}\n`;
+      texto+=`Vendas: ${v.venda} | Vendões: ${v.vendao} | Trocas: ${v.troca} | Sem venda: ${v.saiu} | Total: ${v.total}${v.wpp?` | WhatsApp: ${v.wpp} (R$ ${v.wppValor.toFixed(2)})`:''}\n`;
       // Lista por horário
       const listaOrdenada = v.lista.sort((a,b)=>a.hora>b.hora?1:-1);
       listaOrdenada.forEach(l=>{texto+=`  ${l.hora} ${l.tipo}\n`;});
@@ -481,11 +516,14 @@ main{padding:20px;max-width:860px;margin:0 auto}
 .btn-a{border:none;border-radius:6px;font-size:11px;font-weight:700;padding:6px 11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;white-space:nowrap}
 .btn-atender{background:var(--am);color:var(--pr)}.btn-atender:hover{opacity:.85}
 .btn-reg{background:rgba(34,197,94,.15);color:var(--vd);border:1px solid var(--vd)}.btn-reg:hover{background:rgba(34,197,94,.25)}
+.btn-wpp{background:rgba(37,211,102,.15);color:#25D366;border:1px solid #25D366}.btn-wpp:hover{background:rgba(37,211,102,.25)}
+.vend-stat.wp{color:#25D366;background:rgba(37,211,102,.12)}
+.hist-resultado.whatsapp{color:#25D366}
 .btn-almoco{background:#222;color:#888;border:1px solid #333}.btn-almoco:hover{border-color:#666;color:#ccc}
 .btn-volta{background:rgba(245,200,0,.12);color:var(--am);border:1px solid rgba(245,200,0,.3)}.btn-volta:hover{background:rgba(245,200,0,.2)}
 .btn-casa{background:#1a1a1a;color:#555;border:1px solid #2a2a2a}.btn-casa:hover{border-color:#555;color:#999}
 .btn-voltacasa{background:rgba(100,100,100,.15);color:#aaa;border:1px solid #444}.btn-voltacasa:hover{border-color:#888;color:#ccc}
-.resumo-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+.resumo-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}
 .resumo-card{background:var(--ce);border:1px solid var(--cb);border-radius:10px;padding:12px;text-align:center}
 .resumo-num{font-size:24px;font-weight:900;line-height:1;margin-bottom:3px}.resumo-label{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
 .conv-bar-wrap{background:var(--ce);border:1px solid var(--cb);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
@@ -593,6 +631,7 @@ main{padding:20px;max-width:860px;margin:0 auto}
       <div class="resumo-card"><div class="resumo-num" style="color:var(--am)" id="cnt-total">0</div><div class="resumo-label">Total</div></div>
       <div class="resumo-card"><div class="resumo-num" style="color:var(--vd)" id="cnt-venda">0</div><div class="resumo-label">Vendas</div></div>
       <div class="resumo-card"><div class="resumo-num" style="color:#FFD700" id="cnt-vendao">0</div><div class="resumo-label">Vendões</div></div>
+      <div class="resumo-card"><div class="resumo-num" style="color:#25D366" id="cnt-wpp">0</div><div class="resumo-label">WhatsApp</div></div>
       <div class="resumo-card"><div class="resumo-num" style="color:var(--az)" id="cnt-troca">0</div><div class="resumo-label">Trocas</div></div>
       <div class="resumo-card"><div class="resumo-num" style="color:var(--vm)" id="cnt-saiu">0</div><div class="resumo-label">Sem venda</div></div>
     </div>
@@ -699,6 +738,18 @@ main{padding:20px;max-width:860px;margin:0 auto}
       <button class="btn-mwpp2" onclick="enviarWpp(1)">📲 Nixon</button>
     </div>
     <button class="btn-cancel" style="margin-top:10px" onclick="fecharModalF()">Fechar</button>
+  </div>
+</div>
+
+<!-- MODAL VENDA WHATSAPP -->
+<div class="modal-overlay" id="modal-wpp">
+  <div class="modal">
+    <div class="modal-titulo">📱 Venda WhatsApp</div>
+    <div class="modal-sub">Vendedora: <span id="modal-wpp-nome"></span></div>
+    <input class="input-val" id="input-valor-wpp" type="number" min="0.01" step="0.01" placeholder="Valor da venda (R$)" oninput="atualizaBtnWpp()">
+    <div style="font-size:11px;color:#777;margin-top:8px">Não mexe na fila — a vendedora continua na mesma posição.</div>
+    <button class="btn-confirmar" id="btn-confirmar-wpp" disabled onclick="confirmarWpp()">Registrar venda WhatsApp</button>
+    <button class="btn-cancel" onclick="fecharModalWpp()">Cancelar</button>
   </div>
 </div>
 

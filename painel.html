@@ -82,7 +82,7 @@ function agendarMeiaNoitePainel() {
 function renderTudo() {
   let gTotal=0, gVendas=0, gVendoes=0, gTrocas=0, gSaiu=0;
   LOJAS.forEach(l => {
-    const a = dadosLojas[l.id].atend;
+    const a = dadosLojas[l.id].atend.filter(x=>x.resultado!=='whatsapp');
     gTotal   += a.length;
     gVendas  += a.filter(x=>x.resultado==='venda').length;
     gVendoes += a.filter(x=>x.resultado==='vendao').length;
@@ -101,7 +101,8 @@ function renderTudo() {
   const grid = document.getElementById('lojas-grid');
   grid.innerHTML = LOJAS.map(l => {
     const fila  = dadosLojas[l.id].fila;
-    const atend = dadosLojas[l.id].atend;
+    const atend = dadosLojas[l.id].atend.filter(x=>x.resultado!=='whatsapp');
+    const wppL = dadosLojas[l.id].atend.filter(x=>x.resultado==='whatsapp').length;
     const total  = atend.length;
     const vendas = atend.filter(a=>a.resultado==='venda').length;
     const vendoes= atend.filter(a=>a.resultado==='vendao').length;
@@ -121,6 +122,7 @@ function renderTudo() {
       <div class="loja-nums">
         <div class="loja-num-item"><span class="loja-num" style="color:#22C55E">${vendas}</span><span class="loja-num-l">Vendas</span></div>
         <div class="loja-num-item"><span class="loja-num" style="color:#FFD700">${vendoes}</span><span class="loja-num-l">Vendões</span></div>
+        <div class="loja-num-item"><span class="loja-num" style="color:#25D366">${wppL}</span><span class="loja-num-l">WhatsApp</span></div>
         <div class="loja-num-item"><span class="loja-num" style="color:#3B82F6">${trocas}</span><span class="loja-num-l">Trocas</span></div>
         <div class="loja-num-item"><span class="loja-num" style="color:#EF4444">${saiu}</span><span class="loja-num-l">Sem venda</span></div>
         <div class="loja-num-item"><span class="loja-num" style="color:#F5C800">${total}</span><span class="loja-num-l">Total</span></div>
@@ -235,6 +237,7 @@ function labelPeriodo(valor) {
 }
 
 function renderComparativo(periodoA, periodoB, valA, valB) {
+  periodoA = periodoA.filter(a=>a.resultado!=='whatsapp'); periodoB = periodoB.filter(a=>a.resultado!=='whatsapp');
   document.getElementById('analise-comparativo').style.display = 'block';
 
   const totalA = periodoA.length, totalB = periodoB.length;
@@ -273,6 +276,7 @@ function renderComparativo(periodoA, periodoB, valA, valB) {
 }
 
 function renderAnaliseMensal(atendimentos, selMes) {
+  atendimentos = atendimentos.filter(a=>a.resultado!=='whatsapp');
   document.getElementById('analise-loading').style.display = 'none';
   document.getElementById('analise-conteudo').style.display = 'block';
 
@@ -379,8 +383,8 @@ function renderEdicao() {
   const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
   document.getElementById('ed-titulo').textContent = `${lojaLabel} — ${edData} (${edAtendimentos.length} atendimentos)`;
 
-  const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
-  const rm={venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
+  const em={venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌',whatsapp:'📱'};
+  const rm={venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar',whatsapp:'Venda WhatsApp'};
 
   const listaRev = [...edAtendimentos].reverse();
   document.getElementById('ed-lista').innerHTML = listaRev.length ? listaRev.map((a,_i)=>`
@@ -388,7 +392,7 @@ function renderEdicao() {
       <div class="ed-item-left">
         <div class="ed-item-em">${em[a.resultado]||'?'}</div>
         <div>
-          <div class="ed-item-resultado ${a.resultado}">${rm[a.resultado]||a.resultado}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
+          <div class="ed-item-resultado ${a.resultado}">${rm[a.resultado]||a.resultado}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.valorWhatsapp!=null?' · R$'+Number(a.valorWhatsapp).toFixed(2):''}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
           <div class="ed-item-detalhe">${a.motivo||''}${a.categoria?' · '+a.categoria:''}</div>
         </div>
       </div>
@@ -444,6 +448,7 @@ window.abrirModalNovoAtend = function() {
   document.getElementById('ed-resultado').value = 'venda';
   document.getElementById('ed-hora').value = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('ed-valor-vendao').value = '';
+  document.getElementById('ed-valor-wpp').value = '';
   document.getElementById('ed-diferenca').value = '';
   document.getElementById('ed-motivo-outro').value = '';
   toggleEdCampos();
@@ -463,6 +468,7 @@ window.abrirModalEditar = function(idx) {
   document.getElementById('ed-resultado').value = a.resultado || 'venda';
   document.getElementById('ed-hora').value = a.hora || '';
   document.getElementById('ed-valor-vendao').value = a.valorVendao || '';
+  document.getElementById('ed-valor-wpp').value = a.valorWhatsapp || '';
   document.getElementById('ed-diferenca').value = a.diferenca || '';
   document.getElementById('ed-motivo').value = a.motivo || 'Produto não tinha na loja';
   document.getElementById('ed-categoria').value = a.categoria || '';
@@ -480,6 +486,7 @@ window.fecharModalEd = function() {
 window.toggleEdCampos = function() {
   const res = document.getElementById('ed-resultado').value;
   document.getElementById('ed-bloco-vendao').style.display   = res==='vendao'  ? 'block':'none';
+  document.getElementById('ed-bloco-wpp').style.display = res==='whatsapp' ? 'block':'none';
   document.getElementById('ed-bloco-diferenca').style.display = res==='troca_c' ? 'block':'none';
   document.getElementById('ed-bloco-motivo').style.display   = res==='saiu'    ? 'block':'none';
   if(res!=='saiu') document.getElementById('ed-bloco-categoria').style.display='none';
@@ -497,7 +504,11 @@ window.salvarEdicao = async function() {
   const resultado = document.getElementById('ed-resultado').value;
   const vendedora = document.getElementById('ed-vendedora').value;
   const hora = document.getElementById('ed-hora').value;
-  let valorVendao=null, diferenca=null, motivo=null, categoria=null;
+  let valorVendao=null, valorWhatsapp=null, diferenca=null, motivo=null, categoria=null;
+  if (resultado==='whatsapp') {
+    valorWhatsapp = parseFloat(document.getElementById('ed-valor-wpp').value)||null;
+    if (!valorWhatsapp) { alert('Informe o valor da venda WhatsApp'); return; }
+  }
 
   if (resultado==='vendao') {
     const v = parseFloat(document.getElementById('ed-valor-vendao').value);
@@ -518,9 +529,9 @@ window.salvarEdicao = async function() {
 
   if (edIdEditando) {
     const idx = edAtendimentos.findIndex(a=>String(a.id)===String(edIdEditando));
-    if (idx>=0) edAtendimentos[idx] = {...edAtendimentos[idx], resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria};
+    if (idx>=0) edAtendimentos[idx] = {...edAtendimentos[idx], resultado, vendedora, hora, valorVendao, valorWhatsapp, diferenca, motivo, categoria};
   } else {
-    edAtendimentos.push({id:Date.now(), resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria});
+    edAtendimentos.push({id:Date.now(), resultado, vendedora, hora, valorVendao, valorWhatsapp, diferenca, motivo, categoria});
   }
 
   await salvarAtendimentos();
@@ -709,6 +720,7 @@ function renderRanking(atendimentos) {
   atendimentos.forEach(a => {
     if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, total:0, totalVendao:0, maiorVendao:0, maiorTrocaC:0};
     const s = stats[a.vendedora];
+    if (a.resultado==='whatsapp') return;
     s.total++;
     if (a.resultado==='venda') s.venda++;
     else if (a.resultado==='vendao') {
@@ -848,15 +860,15 @@ async function edBuscar() {
 function edRenderLista() {
   const lojaLabel = document.getElementById('ed-loja').options[document.getElementById('ed-loja').selectedIndex].text;
   document.getElementById('ed-titulo').textContent = `${lojaLabel} · ${_edData} · ${_edList.length} atendimentos`;
-  const em = {venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌'};
-  const rm = {venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar'};
+  const em = {venda:'✅',vendao:'🏆',troca_s:'🔄',troca_c:'💳',saiu:'❌',whatsapp:'📱'};
+  const rm = {venda:'Venda',vendao:'Vendão',troca_s:'Troca sem diferença',troca_c:'Troca com diferença',saiu:'Saiu sem comprar',whatsapp:'Venda WhatsApp'};
   const lista = [..._edList].reverse();
   document.getElementById('ed-lista').innerHTML = lista.length ? lista.map((a,i) => `
     <div class="ed-item">
       <div class="ed-left">
         <span style="font-size:18px">${em[a.resultado]||'?'}</span>
         <div>
-          <div class="ed-res ${a.resultado}">${rm[a.resultado]||a.resultado}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
+          <div class="ed-res ${a.resultado}">${rm[a.resultado]||a.resultado}${a.valorVendao!=null?' · R$'+Number(a.valorVendao).toFixed(2):''}${a.valorWhatsapp!=null?' · R$'+Number(a.valorWhatsapp).toFixed(2):''}${a.diferenca!=null?' · R$'+Number(a.diferenca).toFixed(2):''}</div>
           <div class="ed-det">${a.motivo||''}${a.categoria?' · '+a.categoria:''}</div>
         </div>
       </div>
@@ -887,6 +899,7 @@ function edPopularVendedoras(valorAtual) {
 function edToggleCampos() {
   const res = document.getElementById('ed-resultado').value;
   document.getElementById('ed-bloco-vendao').style.display    = res==='vendao'  ? 'block':'none';
+  document.getElementById('ed-bloco-wpp').style.display = res==='whatsapp' ? 'block':'none';
   document.getElementById('ed-bloco-diferenca').style.display = res==='troca_c' ? 'block':'none';
   document.getElementById('ed-bloco-motivo').style.display    = res==='saiu'    ? 'block':'none';
   if (res!=='saiu') document.getElementById('ed-bloco-categoria').style.display = 'none';
@@ -908,6 +921,7 @@ function edAbrirModal(titulo, a) {
   document.getElementById('ed-resultado').value = a ? (a.resultado||'venda') : 'venda';
   document.getElementById('ed-hora').value = a ? (a.hora||'') : new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('ed-valor-vendao').value = a ? (a.valorVendao||'') : '';
+  document.getElementById('ed-valor-wpp').value = a ? (a.valorWhatsapp||'') : '';
   document.getElementById('ed-diferenca').value = a ? (a.diferenca||'') : '';
   document.getElementById('ed-motivo').value = a ? (a.motivo||'Produto não tinha na loja') : 'Produto não tinha na loja';
   document.getElementById('ed-categoria').value = a ? (a.categoria||'') : '';
@@ -950,7 +964,11 @@ async function edSalvarModal() {
   const resultado = document.getElementById('ed-resultado').value;
   const vendedora = document.getElementById('ed-vendedora').value;
   const hora = document.getElementById('ed-hora').value;
-  let valorVendao=null, diferenca=null, motivo=null, categoria=null;
+  let valorVendao=null, valorWhatsapp=null, diferenca=null, motivo=null, categoria=null;
+  if (resultado==='whatsapp') {
+    valorWhatsapp = parseFloat(document.getElementById('ed-valor-wpp').value)||null;
+    if (!valorWhatsapp) { alert('Informe o valor da venda WhatsApp'); return; }
+  }
   if (resultado==='vendao') {
     valorVendao = parseFloat(document.getElementById('ed-valor-vendao').value)||null;
     if (!valorVendao || valorVendao < 1000) { alert('Informe o valor (mín. R$1.000)'); return; }
@@ -962,7 +980,7 @@ async function edSalvarModal() {
     const comCat = ['Produto não tinha na loja','Não achou o que queria','Não tinha o tamanho certo'];
     if (comCat.includes(motEl)) categoria = document.getElementById('ed-categoria').value||null;
   }
-  const registro = {resultado, vendedora, hora, valorVendao, diferenca, motivo, categoria};
+  const registro = {resultado, vendedora, hora, valorVendao, valorWhatsapp, diferenca, motivo, categoria};
   if (_edEditIdx !== null && _edEditIdx >= 0) {
     registro.id = _edList[_edEditIdx].id;
     _edList[_edEditIdx] = {..._edList[_edEditIdx], ...registro};
@@ -1354,11 +1372,17 @@ main{padding:24px;max-width:1100px;margin:0 auto}
       <option value="troca_s">🔄 Troca sem diferença</option>
       <option value="troca_c">💳 Troca com diferença</option>
       <option value="saiu">❌ Saiu sem comprar</option>
+      <option value="whatsapp">📱 Venda WhatsApp</option>
     </select>
 
     <div id="ed-bloco-vendao" style="display:none;margin-bottom:14px">
       <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Valor do Vendão (R$)</div>
       <input id="ed-valor-vendao" type="number" min="1000" step="0.01" placeholder="Ex: 1500.00" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none">
+    </div>
+
+    <div id="ed-bloco-wpp" style="display:none;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Valor da venda WhatsApp (R$)</div>
+      <input id="ed-valor-wpp" type="number" min="0.01" step="0.01" placeholder="Ex: 350.00" style="width:100%;background:#2A2A2A;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;padding:10px 12px;outline:none">
     </div>
 
     <div id="ed-bloco-diferenca" style="display:none;margin-bottom:14px">
