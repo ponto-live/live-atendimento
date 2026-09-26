@@ -737,7 +737,7 @@ function renderRanking(atendimentos) {
 
   const vendedoras = Object.entries(stats);
   if (!vendedoras.length) {
-    ['rank-vendao','rank-venda','rank-troca','rank-saiu','rank-wpp'].forEach(id=>{
+    ['rank-vendao','rank-venda','rank-troca','rank-saiu','rank-wpp-qtd','rank-wpp-maior'].forEach(id=>{
       document.getElementById(id).innerHTML='<div class="empty-state" style="padding:20px"><div class="big">📋</div>Sem dados</div>';
     });
     return;
@@ -776,19 +776,35 @@ function renderRanking(atendimentos) {
     </div>
   `).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhuma troca com diferença registrada</div>';
 
-  // Ranking de vendas WhatsApp (por valor total)
-  const comWpp = vendedoras.filter(([,v])=>v.wpp>0).sort((a,b)=>b[1].totalWpp-a[1].totalWpp);
+  // Rankings WhatsApp
   const medalhasWpp = ['🥇','🥈','🥉'];
-  document.getElementById('rank-wpp').innerHTML = comWpp.length ? comWpp.map(([nome,v],i)=>`
+  const fmtR = v => 'R$' + v.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  const semWpp = '<div style="color:#555;font-size:12px;padding:16px">Nenhuma venda WhatsApp registrada</div>';
+  const comWpp = vendedoras.filter(([,v])=>v.wpp>0);
+  // Quantidade (desempate: valor total)
+  const porQtd = [...comWpp].sort((a,b)=>b[1].wpp-a[1].wpp || b[1].totalWpp-a[1].totalWpp);
+  document.getElementById('rank-wpp-qtd').innerHTML = porQtd.length ? porQtd.map(([nome,v],i)=>`
     <div class="rank-row">
       <span class="rank-pos">${medalhasWpp[i]||i+1+'º'}</span>
       <span class="rank-nome">${nome}</span>
       <div style="text-align:right;flex-shrink:0">
-        <div class="rank-num" style="color:#25D366;font-size:14px">R$${v.totalWpp.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
-        <div style="font-size:9px;color:#666">${v.wpp} venda(s) · maior R$${v.maiorWpp.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+        <div class="rank-num" style="color:#25D366">${v.wpp}</div>
+        <div style="font-size:9px;color:#666">total ${fmtR(v.totalWpp)}</div>
       </div>
     </div>
-  `).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhuma venda WhatsApp registrada</div>';
+  `).join('') : semWpp;
+  // Maior venda individual
+  const porMaior = [...comWpp].sort((a,b)=>b[1].maiorWpp-a[1].maiorWpp);
+  document.getElementById('rank-wpp-maior').innerHTML = porMaior.length ? porMaior.map(([nome,v],i)=>`
+    <div class="rank-row">
+      <span class="rank-pos">${medalhasWpp[i]||i+1+'º'}</span>
+      <span class="rank-nome">${nome}</span>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="rank-num" style="color:#25D366;font-size:14px">${fmtR(v.maiorWpp)}</div>
+        <div style="font-size:9px;color:#666">${v.wpp} venda(s) no WhatsApp</div>
+      </div>
+    </div>
+  `).join('') : semWpp;
 
   // Ranking de maior vendão por valor
   const comVendao = vendedoras.filter(([,v])=>v.maiorVendao>0).sort((a,b)=>b[1].maiorVendao-a[1].maiorVendao);
@@ -1241,8 +1257,12 @@ main{padding:24px;max-width:1100px;margin:0 auto}
           <div id="rank-vendao"></div>
         </div>
         <div class="ranking-bloco">
-          <div class="ranking-titulo" style="color:#25D366">📱 Vendas WhatsApp</div>
-          <div id="rank-wpp"></div>
+          <div class="ranking-titulo" style="color:#25D366">📱 Mais Vendas WhatsApp</div>
+          <div id="rank-wpp-qtd"></div>
+        </div>
+        <div class="ranking-bloco">
+          <div class="ranking-titulo" style="color:#25D366">📱 Maior Venda WhatsApp</div>
+          <div id="rank-wpp-maior"></div>
         </div>
         <div class="ranking-bloco">
           <div class="ranking-titulo" style="color:var(--vd)">✅ Mais Vendas</div>
