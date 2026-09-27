@@ -606,6 +606,20 @@ main{padding:20px;max-width:860px;margin:0 auto}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--vd);animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 @media(max-width:600px){.resumo-grid{grid-template-columns:repeat(3,1fr)}.motivos-grid{grid-template-columns:1fr}.card-acoes{gap:4px}.btn-a{font-size:10px;padding:5px 8px}}
+/* ── Celular: nome em cima, botões embaixo, nada saindo da tela ── */
+@media(max-width:600px){
+  html,body{overflow-x:hidden}
+  header{flex-wrap:wrap;gap:8px;padding:10px 12px}
+  .header-right{width:100%;justify-content:space-between;gap:6px}
+  .live-badge,.btn-sm,#header-data{white-space:nowrap}
+  .tabs{padding:0 6px}.tab{padding:11px 12px;font-size:13px}
+  main{padding:12px}
+  .card-v{flex-wrap:wrap;padding:12px;gap:10px}
+  .card-v>div:nth-child(2){flex:1 1 0;min-width:0}
+  .v-nome{font-size:16px}.v-status{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card-acoes{flex:1 1 100%;flex-shrink:1;justify-content:stretch;gap:6px}
+  .card-acoes .btn-a{flex:1 1 calc(50% - 3px);font-size:13px;padding:10px 6px;text-align:center}
+}
 </style>
 </head>
 <body>
