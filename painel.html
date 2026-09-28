@@ -1245,6 +1245,104 @@ main{padding:24px;max-width:1100px;margin:0 auto}
  }
 }
 
+
+/* ===== AJUSTE DEFINITIVO: GRADE DESKTOP + TABELA MOBILE ===== */
+
+/* Os dois pares usam exatamente a mesma divisão no desktop */
+.nv-grid-top,
+.nv-grid-bottom{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  column-gap:18px !important;
+  row-gap:18px !important;
+  width:100% !important;
+  align-items:stretch !important;
+}
+.nv-grid-top > *,
+.nv-grid-bottom > *{
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  margin-left:0 !important;
+  margin-right:0 !important;
+}
+
+/* Celular */
+@media (max-width:760px){
+  .nv-grid-top,
+  .nv-grid-bottom{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:16px !important;
+  }
+
+  /* remove a rolagem horizontal do quadro de atendimentos */
+  .nv-table-wrap{
+    overflow:hidden !important;
+    width:100% !important;
+  }
+  .nv-table{
+    width:100% !important;
+    min-width:0 !important;
+    table-layout:fixed !important;
+    border-collapse:collapse !important;
+  }
+
+  /* Loja recebe mais espaço; indicadores ficam compactos */
+  .nv-table th:first-child,
+  .nv-table td:first-child{
+    width:42% !important;
+    text-align:left !important;
+  }
+  .nv-table th:not(:first-child),
+  .nv-table td:not(:first-child){
+    width:auto !important;
+    text-align:center !important;
+  }
+  .nv-table th{
+    font-size:9px !important;
+    padding:10px 2px !important;
+    white-space:normal !important;
+    line-height:1.05 !important;
+  }
+  .nv-table td{
+    font-size:10px !important;
+    padding:11px 2px !important;
+  }
+  .nv-table .nv-store{
+    gap:5px !important;
+    font-size:10px !important;
+  }
+  .nv-table .nv-dot{
+    width:12px !important;
+    height:12px !important;
+    min-width:12px !important;
+  }
+
+  /* no telefone, abrevia visualmente cabeçalhos muito longos */
+  .nv-table th:nth-child(5){font-size:0 !important;}
+  .nv-table th:nth-child(5)::after{content:"Whats";font-size:9px;}
+  .nv-table th:nth-child(7){font-size:0 !important;}
+  .nv-table th:nth-child(7)::after{content:"S/V";font-size:9px;}
+  .nv-table th:nth-child(8){font-size:0 !important;}
+  .nv-table th:nth-child(8)::after{content:"Conv.";font-size:9px;}
+}
+
+
+/* aliases para a estrutura real do painel */
+.novos-top,.novos-bottom,.daily-new-top,.daily-new-bottom{
+ display:grid !important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+ gap:18px !important;width:100% !important;align-items:stretch !important
+}
+.novos-top>*,.novos-bottom>*,.daily-new-top>*,.daily-new-bottom>*{
+ width:100% !important;min-width:0 !important;max-width:none !important;margin:0 !important
+}
+@media(max-width:760px){
+ .novos-top,.novos-bottom,.daily-new-top,.daily-new-bottom{
+  display:flex !important;flex-direction:column !important;gap:16px !important
+ }
+}
+
 </style>
 </head>
 <body>
