@@ -80,13 +80,12 @@ function agendarMeiaNoitePainel() {
 }
 
 function renderTudo() {
-  let gTotal=0, gVendas=0, gVendoes=0, gWpp=0, gTrocas=0, gSaiu=0;
+  let gTotal=0, gVendas=0, gVendoes=0, gTrocas=0, gSaiu=0;
   LOJAS.forEach(l => {
     const a = dadosLojas[l.id].atend.filter(x=>x.resultado!=='whatsapp');
     gTotal   += a.length;
     gVendas  += a.filter(x=>x.resultado==='venda').length;
     gVendoes += a.filter(x=>x.resultado==='vendao').length;
-    gWpp     += dadosLojas[l.id].atend.filter(x=>x.resultado==='whatsapp').length;
     gTrocas  += a.filter(x=>x.resultado==='troca_s'||x.resultado==='troca_c').length;
     gSaiu    += a.filter(x=>x.resultado==='saiu').length;
   });
@@ -94,12 +93,10 @@ function renderTudo() {
   document.getElementById('g-total').textContent=gTotal;
   document.getElementById('g-vendas').textContent=gVendas;
   document.getElementById('g-vendoes').textContent=gVendoes;
-  document.getElementById('g-wpp').textContent=gWpp;
   document.getElementById('g-trocas').textContent=gTrocas;
   document.getElementById('g-saiu').textContent=gSaiu;
   document.getElementById('g-conv').textContent=gTotal>0?gConv+'%':'—';
   document.getElementById('bar-g').style.width=gConv+'%';
-  renderResumoDiario();
 
   const grid = document.getElementById('lojas-grid');
   grid.innerHTML = LOJAS.map(l => {
@@ -117,7 +114,7 @@ function renderTudo() {
     const almoco    = fila.filter(v=>v.status==='almoco').map(v=>v.nome);
     const casa      = fila.filter(v=>v.status==='casa').map(v=>v.nome);
     return `
-    <div class="loja-card loja-${l.id}">
+    <div class="loja-card">
       <div class="loja-header">
         <div><div class="loja-nome">${l.nome}</div><div class="loja-conv">${total>0?conv+'% conversão':'Sem registros ainda'}</div></div>
         <a href="${l.link}" class="btn-acessar">Abrir →</a>
@@ -139,105 +136,43 @@ function renderTudo() {
       </div>
     </div>`;
   }).join('');
+  renderCardsHoje();
 }
 
-
-// ══════════════════ RESUMO VISUAL DO DIA ══════════════════
-// Usa somente os dados que o painel já recebe em tempo real do Firebase.
-function renderResumoDiario() {
-  const host = document.getElementById('daily-ref-host');
-  if (!host) return;
-
-  let gt=0, gv=0, gvd=0, gw=0, gtr=0, gs=0;
-  const statsVend = {};
-  const porHora = {};
-  const cores = {azevedo:'#16A35B', praiamar:'#168BFF', miramar:'#FFD400', praiagrande:'#FF4B94', bioritmo:'#8D24E8'};
-
-  const rows = LOJAS.map(l => {
-    const todos = dadosLojas[l.id]?.atend || [];
-    const normais = todos.filter(a=>a.resultado!=='whatsapp');
-    const total=normais.length;
-    const vendas=normais.filter(a=>a.resultado==='venda').length;
-    const vendoes=normais.filter(a=>a.resultado==='vendao').length;
-    const wpp=todos.filter(a=>a.resultado==='whatsapp').length;
-    const trocas=normais.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
-    const saiu=normais.filter(a=>a.resultado==='saiu').length;
-    const conv=total?Math.round(((vendas+vendoes)/total)*100):0;
-    gt+=total; gv+=vendas; gvd+=vendoes; gw+=wpp; gtr+=trocas; gs+=saiu;
-
-    todos.forEach(a=>{
-      if(a.resultado!=='whatsapp' && a.vendedora){
-        if(!statsVend[a.vendedora]) statsVend[a.vendedora]={loja:l.nome,atend:0,vendas:0};
-        statsVend[a.vendedora].atend++;
-        if(a.resultado==='venda'||a.resultado==='vendao') statsVend[a.vendedora].vendas++;
-      }
-      if(a.resultado!=='whatsapp' && a.hora){
-        const h=parseInt(String(a.hora).split(':')[0],10);
-        if(!Number.isNaN(h)) porHora[h]=(porHora[h]||0)+1;
-      }
+function renderCardsHoje(){
+  const host=document.getElementById('cards-hoje-novos');
+  if(!host) return;
+  const ordem=['azevedo','praiamar','miramar','praiagrande','bioritmo'];
+  const cores={azevedo:'#13c36b',praiamar:'#2787ff',miramar:'#ffd21a',praiagrande:'#ff4d9b',bioritmo:'#9b22f2'};
+  const nomes={azevedo:'Azevedo',praiamar:'Praiamar',miramar:'Miramar',praiagrande:'Praia Grande',bioritmo:'Bioritmo'};
+  let T=0,V=0,VD=0,W=0,TR=0,S=0;
+  const vend={}, horas={};
+  const linhas=ordem.map(id=>{
+    const todos=dadosLojas[id]?.atend||[];
+    const a=todos.filter(x=>x.resultado!=='whatsapp');
+    const total=a.length, vendas=a.filter(x=>x.resultado==='venda').length, vendoes=a.filter(x=>x.resultado==='vendao').length;
+    const w=todos.filter(x=>x.resultado==='whatsapp').length, trocas=a.filter(x=>x.resultado==='troca_s'||x.resultado==='troca_c').length, saiu=a.filter(x=>x.resultado==='saiu').length;
+    const conv=total?Math.round((vendas+vendoes)*100/total):0;
+    T+=total;V+=vendas;VD+=vendoes;W+=w;TR+=trocas;S+=saiu;
+    a.forEach(x=>{
+      if(x.vendedora){const k=id+'|'+x.vendedora;if(!vend[k])vend[k]={nome:x.vendedora,loja:nomes[id],at:0,v:0};vend[k].at++;if(x.resultado==='venda'||x.resultado==='vendao')vend[k].v++;}
+      if(x.hora){const h=parseInt(String(x.hora).slice(0,2),10);if(h>=8&&h<=21)horas[h]=(horas[h]||0)+1;}
     });
-
-    return `<div class="r-row">
-      <div class="r-loja"><i style="background:${cores[l.id]||'#888'}"></i>${l.nome}</div>
-      <div>${total}</div><div>${vendas}</div><div>${vendoes}</div><div>${wpp}</div>
-      <div>${trocas}</div><div>${saiu}</div><div class="r-conv">${conv}%</div>
-    </div>`;
+    return `<div class="dh-row"><div class="dh-store"><i style="background:${cores[id]}"></i>${nomes[id]}</div><b>${total}</b><b>${vendas}</b><b>${vendoes}</b><b>${w}</b><b>${trocas}</b><b>${saiu}</b><strong>${conv}%</strong></div>`;
   }).join('');
-
-  const convG=gt?Math.round(((gv+gvd)/gt)*100):0;
-  const metric=(cls,icon,label,val)=>`<div class="r-metric ${cls}">
-    <div class="r-micon">${icon}</div><div><small>${label}</small><strong>${val}</strong></div>
-  </div>`;
-
-  const ord=Object.entries(statsVend).sort((a,b)=>b[1].vendas-a[1].vendas||b[1].atend-a[1].atend).slice(0,8);
-  const ranks=ord.length?ord.map(([nome,s],i)=>`<div class="r-rank ${i===0?'first':''}">
-    <div>${i+1}</div><div class="r-name">${nome}</div><div>${s.loja}</div><div>${s.atend}</div><div>${s.vendas}</div>
-  </div>`).join(''):`<div class="r-empty">Nenhum registro ainda.</div>`;
-
-  const serie=[]; for(let h=8;h<=21;h++) serie.push({h,v:porHora[h]||0});
-  const maxV=Math.max(...serie.map(x=>x.v),1);
-  const bars=serie.map(x=>`<div class="r-bcol">
-    <span>${x.v}</span><div class="r-barea"><b style="height:${x.v?Math.max(7,(x.v/maxV)*100):0}%"></b></div>
-    <em>${String(x.h).padStart(2,'0')}h</em>
-  </div>`).join('');
-
-  host.innerHTML = `
-  <div class="r-grid r-top">
-    <section class="r-card">
-      <h3>📋 ATENDIMENTOS DO DIA</h3>
-      <div class="r-table">
-        <div class="r-head"><div>Loja</div><div>Total</div><div>Vendas</div><div>Vendões</div><div>WhatsApp</div><div>Trocas</div><div>Sem venda</div><div>Conversão</div></div>
-        ${rows}
-      </div>
-    </section>
-    <section class="r-card">
-      <h3>📊 RESUMO DO DIA</h3>
-      <div class="r-metrics">
-        ${metric('neutral','👥','Total',gt)}
-        ${metric('sale','▣','Vendas',gv)}
-        ${metric('big','◆','Vendões',gvd)}
-        ${metric('wpp','●','WhatsApp',gw)}
-        ${metric('trade','↔','Trocas',gtr)}
-        ${metric('lost','✕','Sem venda',gs)}
-        ${metric('conversion','%','Conversão',convG+'%')}
-      </div>
-    </section>
-  </div>
-  <div class="r-grid r-bottom">
-    <section class="r-card">
-      <h3>🏆 RANKING DE VENDEDORAS (HOJE)</h3>
-      <div class="r-ranking">
-        <div class="r-rank r-rhead"><div>#</div><div>Vendedora</div><div>Loja</div><div>Atend.</div><div>Vendas</div></div>
-        ${ranks}
-      </div>
-    </section>
-    <section class="r-card">
-      <h3>📈 EVOLUÇÃO DO DIA</h3>
-      <div class="r-chart">
-        <div class="r-y"><span>${maxV}</span><span>${Math.ceil(maxV*.66)}</span><span>${Math.ceil(maxV*.33)}</span><span>0</span></div>
-        <div class="r-bars">${bars}</div>
-      </div>
-    </section>
+  const conv=T?Math.round((V+VD)*100/T):0;
+  const ranking=Object.values(vend).sort((a,b)=>b.v-a.v||b.at-a.at).slice(0,7);
+  const medals=['1º','2º','3º'];
+  const rankhtml=ranking.length?ranking.map((r,i)=>`<div class="dh-rank ${i<3?'top'+(i+1):''}"><span class="dh-pos">${medals[i]||i+1+'º'}</span><strong>${r.nome}</strong><span>${r.loja}</span><b>${r.at}</b><b>${r.v}</b></div>`).join(''):'<div class="dh-empty">Nenhum atendimento registrado hoje.</div>';
+  const max=Math.max(1,...Array.from({length:14},(_,i)=>horas[i+8]||0));
+  const barhtml=Array.from({length:14},(_,i)=>{const h=i+8,v=horas[h]||0;return `<div class="dh-barcol"><b>${v}</b><div class="dh-barbox"><i style="height:${v?Math.max(6,v/max*100):0}%"></i></div><span>${String(h).padStart(2,'0')}h</span></div>`}).join('');
+  const metric=(c,icon,label,val)=>`<div class="dh-metric ${c}"><div class="dh-icon">${icon}</div><div><span>${label}</span><strong>${val}</strong></div></div>`;
+  host.innerHTML=`<div class="dh-grid dh-top">
+    <section class="dh-card dh-att"><h2>📋 ATENDIMENTOS DO DIA</h2><div class="dh-table"><div class="dh-head"><span>Loja</span><span>Total</span><span>Vendas</span><span>Vendões</span><span>WhatsApp</span><span>Trocas</span><span>Sem venda</span><span>Conversão</span></div>${linhas}</div></section>
+    <section class="dh-card dh-summary"><h2>📊 RESUMO DO DIA</h2><div class="dh-metrics">${metric('m-total','👥','Total',T)}${metric('m-vendas','🛍️','Vendas',V)}${metric('m-vendoes','◆','Vendões',VD)}${metric('m-wpp','☎','WhatsApp',W)}${metric('m-trocas','↔','Trocas',TR)}${metric('m-sem','✕','Sem venda',S)}${metric('m-conv','%','Conversão',conv+'%')}</div></section>
+  </div><div class="dh-grid dh-bottom">
+    <section class="dh-card dh-ranking"><h2>🏆 RANKING DE VENDEDORAS (HOJE)</h2><div class="dh-rtable"><div class="dh-rhead"><span>#</span><span>Vendedora</span><span>Loja</span><span>Atend.</span><span>Vendas</span></div>${rankhtml}</div></section>
+    <section class="dh-card dh-evo"><h2>📈 EVOLUÇÃO DO DIA</h2><div class="dh-chart"><div class="dh-bars">${barhtml}</div></div></section>
   </div>`;
 }
 
@@ -1267,319 +1202,18 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 .btn-mpdf:hover{opacity:.9}
 .modal-acoes{display:flex;gap:8px;flex-wrap:wrap}
 
-/* =========================================================
-   LIVE! PAINEL — REDESIGN ESCURO 2026
-   Mantém as funções existentes e acrescenta apenas visões
-   derivadas dos dados que já chegam ao painel.
-   ========================================================= */
-:root{
- --bg:#080B0E;--surface:#10161B;--surface2:#131C23;--line:#23303A;
- --txt:#F4F7FA;--muted:#8E9AA5;--yellow:#F5C800;
- --sale:#168BFF;--wpp:#25D366;--vendao:#B347F5;--troca:#FF9D00;--no:#FF4D55;
-}
-body{background:var(--bg);color:var(--txt)}
-header{background:#090D11;border-bottom:1px solid #26313A;padding:14px 24px}
-.logo{font-size:24px}.painel-tag{background:var(--yellow);color:#080B0E}
-.tabs-principal{background:#0D1115;border-bottom:1px solid #28323A;overflow-x:auto}
-.tab-principal{color:#8A939B;white-space:nowrap}
-.tab-principal.ativo{color:var(--yellow);border-bottom-color:var(--yellow)}
-main{max-width:1440px;padding:24px 26px 48px}
-.total-card,.daily-panel,.am-bloco,.ranking-bloco,.am-resumo-card{
- background:linear-gradient(180deg,#111920,#0D1419);
- border:1px solid #23303A;box-shadow:0 8px 28px rgba(0,0,0,.18)
-}
-.total-card{border-radius:13px}
-.total-grid{grid-template-columns:repeat(7,1fr)}
-.total-item{background:#0C1217;border:1px solid #1D2932;border-radius:9px;padding:11px 6px}
-#g-vendas{color:var(--sale)!important}#g-vendoes{color:var(--vendao)!important}
-#g-wpp{color:var(--wpp)!important}#g-trocas{color:var(--troca)!important}
-#g-saiu{color:var(--no)!important}
-.lojas-grid{grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
-.loja-card{--loja:#F5C800;background:linear-gradient(180deg,#10171D,#0B1116);border:1px solid #26323B;border-top:4px solid var(--loja);border-radius:13px;box-shadow:0 7px 22px rgba(0,0,0,.18)}
-.loja-card:hover{border-color:#35444F;border-top-color:var(--loja)}
-.loja-praiamar{--loja:#168BFF}.loja-miramar{--loja:#FFD400}.loja-azevedo{--loja:#16A35B}
-.loja-praiagrande{--loja:#FF168A}.loja-bioritmo{--loja:#8D24E8}
-.loja-nome{color:#fff}.btn-acessar{background:var(--loja);color:#fff}.loja-miramar .btn-acessar{color:#111}
-.loja-num-item:nth-child(1) .loja-num{color:var(--sale)!important}
-.loja-num-item:nth-child(2) .loja-num{color:var(--vendao)!important}
-.loja-num-item:nth-child(3) .loja-num{color:var(--wpp)!important}
-.loja-num-item:nth-child(4) .loja-num{color:var(--troca)!important}
-.loja-num-item:nth-child(5) .loja-num{color:var(--no)!important}
-.loja-num-item:nth-child(6) .loja-num{color:#fff!important}
-.loja-card .bar-in{background:var(--loja)}
-.fila-mini-item.vez{color:#FFE138;background:rgba(245,200,0,.08)}
-.fila-mini-item.atend{color:#3B9CFF;background:rgba(22,139,255,.08)}
-.fila-mini-item.alm{color:#FF9D4D;background:rgba(255,157,0,.07)}
-.fila-mini-item.casa{color:#77838E;background:rgba(255,255,255,.025)}
-
-.daily-grid{display:grid;gap:14px;margin-top:14px}
-.top-daily{grid-template-columns:minmax(0,2fr) minmax(270px,.9fr);margin-top:26px}
-.bottom-daily{grid-template-columns:1fr 1fr}
-.daily-panel{border-radius:13px;padding:14px;min-width:0}
-.daily-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.25px;margin-bottom:12px;color:#F2F5F7}
-.daily-table-wrap{overflow-x:auto;border:1px solid #1F2C35;border-radius:9px}
-.daily-table{width:100%;border-collapse:collapse;font-size:11px;min-width:600px}
-.daily-table th{background:#14202A;color:#C8D0D7;font-weight:600;text-align:left;padding:9px 10px}
-.daily-table td{padding:8px 10px;border-top:1px solid #1C2831;color:#E4E9ED}
-.daily-table th:not(:first-child),.daily-table td:not(:first-child){text-align:center}
-.loja-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:-2px}
-.loja-dot-azevedo{background:#16A35B}.loja-dot-praiamar{background:#168BFF}.loja-dot-miramar{background:#FFD400}
-.loja-dot-praiagrande{background:#FF168A}.loja-dot-bioritmo{background:#8D24E8}
-.resumo-dia{border:1px solid #1F2C35;border-radius:9px;overflow:hidden}
-.resumo-dia>div{display:flex;justify-content:space-between;align-items:center;padding:8px 11px;border-bottom:1px solid #1C2831;font-size:11px}
-.resumo-dia>div:last-child{border-bottom:0}.resumo-dia strong{font-size:14px}
-.resumo-dia .azul{color:var(--sale)}.resumo-dia .verde{color:var(--wpp)}.resumo-dia .roxo{color:var(--vendao)}
-.resumo-dia .laranja{color:var(--troca)}.resumo-dia .vermelho{color:var(--no)}
-.ranking-hoje{min-width:480px}.vendas-cell{color:var(--sale)!important;font-weight:800}
-.daily-empty{text-align:center;color:#8A99A6;font-size:12px;padding:36px 10px;line-height:2}
-.evolucao-dia{height:190px;border:1px solid #1F2C35;border-radius:9px;padding:18px 14px;display:flex;align-items:center;justify-content:center}
-.evolucao-bars{height:145px;width:100%;display:flex;align-items:flex-end;gap:8px}
-.evo-col{height:100%;flex:1;min-width:24px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
-.evo-bar{width:min(32px,70%);background:linear-gradient(180deg,#F5C800,#B99600);border-radius:5px 5px 2px 2px;min-height:8px}
-.evo-num{font-size:9px;color:#C6CDD3;margin-bottom:4px}.evo-hora{font-size:8px;color:#77838E;margin-top:5px}
-.am-select{background:#111920;color:#fff;border-color:#2A3741}.am-select:focus{border-color:var(--yellow)}
-.btn-am-buscar,.btn-mpdf{background:var(--yellow);color:#080B0E}
-.am-resumo-card,.am-bloco,.ranking-bloco{border-color:#26323B}
-.rank-row{background:#131D24}.rank-nome{color:#E7EBEE}
-.ed-item{background:#111920;border-color:#26323B}
-.modal{background:#111920;border-color:#2A3741}
-input,select,textarea{color-scheme:dark}
-
-@media(max-width:900px){
- main{padding:18px 14px 36px}.total-grid{grid-template-columns:repeat(4,1fr)}
- .top-daily,.bottom-daily{grid-template-columns:1fr}.lojas-grid{grid-template-columns:1fr}
-}
-@media(max-width:600px){
- header{padding:12px 14px}.tabs-principal{padding:0 8px}.tab-principal{padding:12px 10px;font-size:11px}
- main{padding:14px 10px 30px}.total-grid{grid-template-columns:repeat(2,1fr)}
- .total-item:last-child{grid-column:span 2}.loja-card{padding:14px}
- .daily-panel{padding:11px}.daily-title{font-size:12px}
- .evolucao-dia{height:170px}.evolucao-bars{height:125px}
-}
-
-
-/* Cards diários — versão robusta */
-.daily-table{width:100%!important;border-collapse:collapse!important;min-width:600px!important;font-size:11px!important}
-.daily-table th{background:#14212B!important;color:#C9D2D9!important;padding:9px 11px!important;text-align:left!important;white-space:nowrap!important}
-.daily-table td{color:#EAF0F4!important;padding:9px 11px!important;border-top:1px solid #1E2B34!important;white-space:nowrap!important}
-.daily-table th:not(:first-child),.daily-table td:not(:first-child){text-align:center!important}
-.resumo-dia>div{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:18px!important;min-height:38px!important;padding:8px 12px!important;border-bottom:1px solid #1E2B34!important;font-size:11px!important}
-.resumo-dia>div:last-child{border-bottom:0!important}
-.resumo-dia strong{font-size:16px!important;font-weight:900!important;min-width:34px!important;text-align:right!important}
-.resumo-dia .azul{color:#168BFF!important}.resumo-dia .verde{color:#25D366!important}.resumo-dia .roxo{color:#B347F5!important}.resumo-dia .laranja{color:#FF9D00!important}.resumo-dia .vermelho{color:#FF4D55!important}
-.evolucao-bars{height:175px!important;width:100%!important;display:flex!important;align-items:flex-end!important;gap:9px!important;border-bottom:1px solid #263540!important}
-.evo-col{height:100%!important;flex:1!important;display:flex!important;flex-direction:column!important;justify-content:flex-end!important;align-items:center!important;min-width:28px!important}
-.evo-bar{width:min(34px,70%)!important;min-height:8px!important;background:linear-gradient(180deg,#F7D31E,#C79F00)!important;border-radius:6px 6px 2px 2px!important}
-.evo-num{font-size:10px!important;color:#D8E0E5!important;margin-bottom:5px!important}.evo-hora{font-size:9px!important;color:#7F8C96!important;margin-top:6px!important}
-@media(max-width:900px){
-  .top-daily,.bottom-daily{grid-template-columns:1fr!important}
-}
-
-
-/* ===== PAINEL HOJE — acabamento final baseado na referência aprovada ===== */
-#view-hoje .daily-grid{display:grid!important;gap:16px!important;width:100%!important}
-#view-hoje .top-daily{grid-template-columns:minmax(0,2fr) minmax(320px,.9fr)!important;margin-top:26px!important}
-#view-hoje .bottom-daily{grid-template-columns:1.05fr .95fr!important;margin-top:16px!important}
-#view-hoje .daily-panel{
- background:linear-gradient(145deg,#101820,#0B1217)!important;border:1px solid #263641!important;
- border-radius:14px!important;padding:15px!important;box-shadow:0 10px 28px rgba(0,0,0,.24)!important;min-width:0!important
-}
-#view-hoje .daily-title{font-size:13px!important;font-weight:900!important;color:#F7F9FA!important;margin:0 0 12px!important}
-#view-hoje .daily-table-wrap{background:#091116!important;border:1px solid #21313B!important;border-radius:10px!important;overflow-x:auto!important}
-#view-hoje .daily-table{width:100%!important;min-width:650px!important;border-collapse:collapse!important;font-size:11px!important}
-#view-hoje .daily-table th{background:#15212A!important;color:#BFC9D0!important;font-size:9px!important;padding:8px 10px!important}
-#view-hoje .daily-table td{padding:8px 10px!important;border-top:1px solid #1B2932!important;color:#EEF3F6!important}
-#view-hoje .daily-table td:first-child{font-weight:600!important}
-#view-hoje .conv-cell{font-weight:900!important}
-#view-hoje .loja-dot{width:13px!important;height:13px!important;margin-right:8px!important}
-
-#view-hoje .resumo-dia{
- display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;
- background:transparent!important;border:0!important;border-radius:0!important;overflow:visible!important
-}
-#view-hoje .metric-card{
- min-height:72px!important;border-radius:10px!important;padding:10px!important;display:flex!important;align-items:center!important;
- gap:10px!important;border:1px solid #33414B!important;background:#151D24!important;box-shadow:inset 0 0 18px rgba(255,255,255,.015)!important
-}
-#view-hoje .metric-icon{width:34px!important;height:34px!important;border-radius:50%!important;display:grid!important;place-items:center!important;font-size:19px!important;font-weight:900!important;flex:0 0 34px!important}
-#view-hoje .metric-copy{display:flex!important;flex-direction:column!important;min-width:0!important}
-#view-hoje .metric-copy small{font-size:9px!important;color:#D5DCE1!important;line-height:1.1!important;white-space:nowrap!important}
-#view-hoje .metric-copy strong{font-size:22px!important;line-height:1.05!important;color:#fff!important;margin-top:3px!important}
-#view-hoje .metric-total{border-color:#43515C!important}.metric-total .metric-icon{background:#56616B!important}
-#view-hoje .metric-venda{border-color:#086FD1!important;background:linear-gradient(135deg,#092642,#0C1B29)!important}.metric-venda .metric-icon{background:#087FEA!important}
-#view-hoje .metric-vendao{border-color:#7E22CE!important;background:linear-gradient(135deg,#28103C,#171021)!important}.metric-vendao .metric-icon{background:#8B20D9!important}
-#view-hoje .metric-wpp{border-color:#0C9D48!important;background:linear-gradient(135deg,#07351D,#0A1E14)!important}.metric-wpp .metric-icon{background:#00B94F!important}
-#view-hoje .metric-troca{border-color:#B96B00!important;background:linear-gradient(135deg,#3A2106,#20170C)!important}.metric-troca .metric-icon{background:#E48700!important}
-#view-hoje .metric-sem{border-color:#B72B31!important;background:linear-gradient(135deg,#3A1114,#211012)!important}.metric-sem .metric-icon{background:#E9363D!important}
-#view-hoje .metric-conv{grid-column:1/-1!important;min-height:62px!important;border-color:#A88700!important;background:linear-gradient(90deg,#3A3008,#1A180D)!important}.metric-conv .metric-icon{background:#F5C800!important;color:#111!important}
-
-#view-hoje .ranking-hoje{min-width:520px!important}
-#view-hoje .rank-first{background:linear-gradient(90deg,rgba(245,200,0,.19),rgba(245,200,0,.04))!important}
-#view-hoje .rank-medal{display:inline-grid!important;place-items:center!important;min-width:30px!important;height:30px!important;border-radius:50%!important;background:#D8DEE3!important;color:#26313A!important;font-weight:900!important}
-#view-hoje .rank-first .rank-medal{background:#F5C800!important;color:#111!important;box-shadow:0 0 14px rgba(245,200,0,.28)!important}
-#view-hoje .vendas-cell{color:#fff!important;font-weight:900!important}
-
-#view-hoje .evolucao-dia{height:260px!important;padding:18px 14px!important;display:flex!important;align-items:stretch!important;background:#091116!important;border:1px solid #21313B!important}
-#view-hoje .chart-y{width:24px!important;display:flex!important;flex-direction:column!important;justify-content:space-between!important;color:#84929D!important;font-size:8px!important;padding:4px 0 21px!important}
-#view-hoje .evolucao-bars{flex:1!important;height:auto!important;display:flex!important;align-items:stretch!important;gap:5px!important;border-left:1px solid #263641!important;border-bottom:1px solid #263641!important;padding:0 4px!important;background:repeating-linear-gradient(to top,transparent 0,transparent 49px,rgba(255,255,255,.035) 50px)!important}
-#view-hoje .evo-col{height:100%!important;flex:1!important;min-width:20px!important;display:grid!important;grid-template-rows:18px 1fr 20px!important;align-items:end!important;justify-items:center!important}
-#view-hoje .evo-bar-wrap{height:100%!important;width:100%!important;display:flex!important;align-items:flex-end!important;justify-content:center!important}
-#view-hoje .evo-bar{width:min(28px,75%)!important;background:linear-gradient(180deg,#35A5FF,#0878DE)!important;border-radius:2px 2px 0 0!important;box-shadow:0 0 10px rgba(22,139,255,.16)!important}
-#view-hoje .evo-num{font-size:8px!important;color:#E9EEF2!important;margin:0!important;align-self:end!important}
-#view-hoje .evo-hora{font-size:8px!important;color:#87949E!important;margin:5px 0 0!important;align-self:start!important}
-
-@media(max-width:760px){
- #view-hoje .daily-grid,#view-hoje .top-daily,#view-hoje .bottom-daily{display:flex!important;flex-direction:column!important;gap:12px!important;width:100%!important;margin-top:14px!important}
- #view-hoje .daily-panel{width:100%!important;max-width:100%!important;padding:12px!important;border-radius:12px!important}
- #view-hoje .daily-title{font-size:12px!important}
- #view-hoje .resumo-dia{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
- #view-hoje .metric-card{min-height:65px!important;padding:8px!important;gap:8px!important}
- #view-hoje .metric-icon{width:30px!important;height:30px!important;flex-basis:30px!important;font-size:16px!important}
- #view-hoje .metric-copy small{font-size:8px!important}
- #view-hoje .metric-copy strong{font-size:19px!important}
- #view-hoje .metric-conv{grid-column:1/-1!important}
- #view-hoje .daily-table{font-size:10px!important}
- #view-hoje .daily-table-wrap{width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
- #view-hoje .ranking-hoje{min-width:470px!important}
- #view-hoje .evolucao-dia{height:220px!important;padding:12px 8px!important;overflow-x:auto!important}
- #view-hoje .evolucao-bars{min-width:520px!important;gap:3px!important}
- #view-hoje .evo-hora{font-size:7px!important}
-}
-
-
-/* ==========================================================
-   BLOCO DIÁRIO ISOLADO — baseado diretamente na referência
-   Prefixo r- evita conflito com o CSS antigo do painel.
-   ========================================================== */
-#daily-ref-host{all:initial;display:block;font-family:Arial,sans-serif;color:#f4f7f9;margin-top:24px}
-#daily-ref-host *{box-sizing:border-box}
-#daily-ref-host .r-grid{display:grid;gap:12px;width:100%}
-#daily-ref-host .r-top{grid-template-columns:minmax(0,1.75fr) minmax(300px,.9fr)}
-#daily-ref-host .r-bottom{grid-template-columns:1.08fr .92fr;margin-top:12px}
-#daily-ref-host .r-card{background:linear-gradient(180deg,#101920,#0b1217);border:1px solid #233640;border-radius:12px;padding:12px;min-width:0;box-shadow:0 8px 24px rgba(0,0,0,.25)}
-#daily-ref-host h3{margin:0 0 10px;font-size:12px;line-height:1.2;font-weight:900;color:#f6f8fa}
-
-#daily-ref-host .r-table{background:#081116;border:1px solid #1d2d36;border-radius:8px;overflow:hidden}
-#daily-ref-host .r-head,#daily-ref-host .r-row{display:grid;grid-template-columns:1.5fr repeat(6,.72fr) .9fr;align-items:center;min-width:620px}
-#daily-ref-host .r-head{background:#14212a;color:#b9c4cb;font-size:8px}
-#daily-ref-host .r-row{font-size:10px;color:#edf2f5;border-top:1px solid #19272f}
-#daily-ref-host .r-head>div,#daily-ref-host .r-row>div{padding:7px 8px;text-align:center;white-space:nowrap}
-#daily-ref-host .r-head>div:first-child,#daily-ref-host .r-row>div:first-child{text-align:left}
-#daily-ref-host .r-loja{font-weight:600;display:flex;align-items:center}
-#daily-ref-host .r-loja i{width:12px;height:12px;border-radius:50%;margin-right:8px;flex:none}
-#daily-ref-host .r-conv{font-weight:900}
-
-#daily-ref-host .r-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-#daily-ref-host .r-metric{min-height:58px;border:1px solid #40505b;border-radius:8px;background:#151e25;padding:8px;display:flex;align-items:center;gap:8px}
-#daily-ref-host .r-micon{width:31px;height:31px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:16px;font-weight:900;background:#59656f;color:#fff}
-#daily-ref-host .r-metric small{display:block;font-size:8px;color:#d7dde1;white-space:nowrap}
-#daily-ref-host .r-metric strong{display:block;font-size:18px;line-height:1.05;color:#fff;margin-top:2px}
-#daily-ref-host .sale{border-color:#087fe0;background:linear-gradient(135deg,#092b4c,#101a22)} #daily-ref-host .sale .r-micon{background:#087fea}
-#daily-ref-host .big{border-color:#8225ce;background:linear-gradient(135deg,#2c1043,#17121c)} #daily-ref-host .big .r-micon{background:#8b20d9}
-#daily-ref-host .wpp{border-color:#0aa24b;background:linear-gradient(135deg,#07391f,#0b1e14)} #daily-ref-host .wpp .r-micon{background:#00b94f}
-#daily-ref-host .trade{border-color:#b86a00;background:linear-gradient(135deg,#3a2207,#21170d)} #daily-ref-host .trade .r-micon{background:#e48700}
-#daily-ref-host .lost{border-color:#b82c33;background:linear-gradient(135deg,#3a1115,#211013)} #daily-ref-host .lost .r-micon{background:#e9363d}
-#daily-ref-host .conversion{grid-column:1/-1;min-height:51px;border-color:#a88700;background:linear-gradient(90deg,#392f07,#17160c)}
-#daily-ref-host .conversion .r-micon{background:#f5c800;color:#111}
-
-#daily-ref-host .r-ranking{background:#081116;border:1px solid #1d2d36;border-radius:8px;overflow:hidden}
-#daily-ref-host .r-rank{display:grid;grid-template-columns:34px 1.35fr 1fr .65fr .65fr;align-items:center;min-height:32px;padding:0 8px;font-size:10px;border-top:1px solid #19272f}
-#daily-ref-host .r-rhead{background:#14212a;color:#b9c4cb;border-top:0;font-size:8px;min-height:29px}
-#daily-ref-host .r-rank>div:not(:nth-child(2)):not(:nth-child(3)){text-align:center}
-#daily-ref-host .r-name{font-weight:800}
-#daily-ref-host .r-rank.first{background:linear-gradient(90deg,rgba(245,200,0,.20),rgba(245,200,0,.03))}
-#daily-ref-host .r-empty{text-align:center;padding:35px;color:#7e8b95;font-size:10px}
-
-#daily-ref-host .r-chart{height:190px;background:#081116;border:1px solid #1d2d36;border-radius:8px;padding:10px;display:grid;grid-template-columns:22px 1fr}
-#daily-ref-host .r-y{display:flex;flex-direction:column;justify-content:space-between;padding:0 4px 19px 0;font-size:7px;color:#7f8d97;text-align:right}
-#daily-ref-host .r-bars{display:flex;gap:4px;border-left:1px solid #263640;border-bottom:1px solid #263640;background:repeating-linear-gradient(to top,transparent 0,transparent 36px,rgba(255,255,255,.04) 37px)}
-#daily-ref-host .r-bcol{flex:1;min-width:17px;display:grid;grid-template-rows:14px 1fr 18px;justify-items:center;align-items:end}
-#daily-ref-host .r-bcol>span{font-size:7px;color:#e8edf1}
-#daily-ref-host .r-barea{height:100%;width:100%;display:flex;align-items:flex-end;justify-content:center}
-#daily-ref-host .r-barea b{display:block;width:min(24px,72%);background:linear-gradient(180deg,#35a7ff,#0879de);border-radius:2px 2px 0 0;box-shadow:0 0 8px rgba(22,139,255,.2)}
-#daily-ref-host .r-bcol em{font-style:normal;font-size:7px;color:#87949e;align-self:start;margin-top:4px}
-
-@media(max-width:760px){
- #daily-ref-host{margin-top:14px}
- #daily-ref-host .r-grid{display:flex;flex-direction:column;gap:11px}
- #daily-ref-host .r-bottom{margin-top:11px}
- #daily-ref-host .r-card{width:100%;padding:10px;border-radius:11px}
- #daily-ref-host h3{font-size:11px}
- #daily-ref-host .r-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
- #daily-ref-host .r-metric{min-height:58px;padding:7px}
- #daily-ref-host .conversion{grid-column:1/-1}
- #daily-ref-host .r-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
- #daily-ref-host .r-ranking{overflow-x:auto;-webkit-overflow-scrolling:touch}
- #daily-ref-host .r-rank{min-width:470px}
- #daily-ref-host .r-chart{height:205px;overflow-x:auto}
- #daily-ref-host .r-bars{min-width:500px}
-}
-
-
-/* CARDS COLORIDOS — REFERÊNCIA APROVADA */
-#daily-ref-host{all:initial;display:block;font-family:Arial,sans-serif;color:#f5f7fa;margin-top:24px}
-#daily-ref-host *{box-sizing:border-box}
-#daily-ref-host .r-grid{display:grid;gap:14px;width:100%}
-#daily-ref-host .r-top{grid-template-columns:minmax(0,1.7fr) minmax(360px,.95fr)}
-#daily-ref-host .r-bottom{grid-template-columns:1fr 1fr;margin-top:14px}
-#daily-ref-host .r-card{background:linear-gradient(145deg,#0d1821,#071017);border:1px solid #0d668f;border-radius:16px;padding:15px;min-width:0;box-shadow:0 10px 28px rgba(0,0,0,.30),inset 0 0 28px rgba(0,140,255,.035)}
-#daily-ref-host .r-top .r-card:nth-child(2){border-color:#168c43;box-shadow:0 10px 28px rgba(0,0,0,.30),inset 0 0 34px rgba(0,210,90,.05)}
-#daily-ref-host .r-bottom .r-card:first-child{border-color:#426d31}
-#daily-ref-host .r-bottom .r-card:last-child{border-color:#1555a5}
-#daily-ref-host h3{margin:0 0 12px;font-size:15px;line-height:1.2;font-weight:900;color:#f8fafc}
-#daily-ref-host .r-table{background:#071118;border:1px solid #173442;border-radius:11px;overflow:hidden}
-#daily-ref-host .r-head,#daily-ref-host .r-row{display:grid;grid-template-columns:1.55fr repeat(6,.72fr) .9fr;align-items:center;min-width:650px}
-#daily-ref-host .r-head{background:linear-gradient(180deg,#18374b,#112b3a);color:#e1e8ed;font-size:10px;font-weight:700}
-#daily-ref-host .r-row{font-size:12px;color:#f0f4f7;border-top:1px solid #17303b;min-height:40px}
-#daily-ref-host .r-head>div,#daily-ref-host .r-row>div{padding:9px;text-align:center;white-space:nowrap}
-#daily-ref-host .r-head>div:first-child,#daily-ref-host .r-row>div:first-child{text-align:left}
-#daily-ref-host .r-loja{font-weight:700;display:flex;align-items:center}
-#daily-ref-host .r-loja i{width:17px;height:17px;border-radius:50%;margin-right:10px;flex:none}
-#daily-ref-host .r-conv{font-size:14px;font-weight:900}
-#daily-ref-host .r-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-#daily-ref-host .r-metric{min-height:86px;border:1px solid #435362;border-radius:12px;background:linear-gradient(135deg,#17232d,#101820);padding:12px;display:flex;align-items:center;gap:11px}
-#daily-ref-host .r-micon{width:45px;height:45px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:22px;font-weight:900;background:#59656f;color:#fff}
-#daily-ref-host .r-metric small{display:block;font-size:11px;color:#eef2f5;white-space:nowrap}
-#daily-ref-host .r-metric strong{display:block;font-size:26px;line-height:1;color:#fff;margin-top:5px}
-#daily-ref-host .sale{border-color:#087fea;background:linear-gradient(135deg,#073967,#09213a)} #daily-ref-host .sale .r-micon{background:#087fea}
-#daily-ref-host .big{border-color:#a225e5;background:linear-gradient(135deg,#42115e,#21102f)} #daily-ref-host .big .r-micon{background:#9b20df}
-#daily-ref-host .wpp{border-color:#00b94f;background:linear-gradient(135deg,#064d26,#092b1a)} #daily-ref-host .wpp .r-micon{background:#00c957}
-#daily-ref-host .trade{border-color:#d27700;background:linear-gradient(135deg,#542a05,#2c1b0c)} #daily-ref-host .trade .r-micon{background:#ef8b00}
-#daily-ref-host .lost{border-color:#d9273c;background:linear-gradient(135deg,#52121b,#2d1015)} #daily-ref-host .lost .r-micon{background:#f12f43}
-#daily-ref-host .conversion{grid-column:1/-1;min-height:74px;border-color:#d1a900;background:linear-gradient(90deg,#594708,#2a250d)}
-#daily-ref-host .conversion .r-micon{background:#ffd400;color:#151515}
-#daily-ref-host .r-ranking{background:#071118;border:1px solid #203846;border-radius:11px;overflow:hidden}
-#daily-ref-host .r-rank{display:grid;grid-template-columns:52px 1.45fr 1fr .7fr .7fr;align-items:center;min-height:44px;padding:0 10px;font-size:12px;border-top:1px solid #1a303a}
-#daily-ref-host .r-rhead{background:linear-gradient(180deg,#182a35,#111e27);color:#cdd6dc;border-top:0;font-size:10px;min-height:36px}
-#daily-ref-host .r-rank>div:not(:nth-child(2)):not(:nth-child(3)){text-align:center}
-#daily-ref-host .r-name{font-size:13px;font-weight:900}
-#daily-ref-host .r-rank.first{background:linear-gradient(90deg,rgba(255,205,0,.34),rgba(255,205,0,.08))}
-#daily-ref-host .r-rank.first>div:first-child{color:#111;background:#ffd400;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;font-weight:900}
-#daily-ref-host .r-empty{text-align:center;padding:38px;color:#7e8b95;font-size:11px}
-#daily-ref-host .r-chart{height:235px;background:#071118;border:1px solid #1b3850;border-radius:11px;padding:12px;display:grid;grid-template-columns:28px 1fr}
-#daily-ref-host .r-y{display:flex;flex-direction:column;justify-content:space-between;padding:0 5px 22px 0;font-size:9px;color:#91a0aa;text-align:right}
-#daily-ref-host .r-bars{display:flex;gap:6px;border-left:1px solid #244050;border-bottom:1px solid #244050;background:repeating-linear-gradient(to top,transparent 0,transparent 43px,rgba(110,160,190,.10) 44px)}
-#daily-ref-host .r-bcol{flex:1;min-width:18px;display:grid;grid-template-rows:18px 1fr 21px;justify-items:center;align-items:end}
-#daily-ref-host .r-bcol>span{font-size:9px;color:#f1f5f8;font-weight:800}
-#daily-ref-host .r-barea{height:100%;width:100%;display:flex;align-items:flex-end;justify-content:center}
-#daily-ref-host .r-barea b{display:block;width:min(31px,75%);background:linear-gradient(180deg,#29b4ff,#0878e5);border-radius:3px 3px 0 0;box-shadow:0 0 13px rgba(0,145,255,.35)}
-#daily-ref-host .r-bcol em{font-style:normal;font-size:8px;color:#a3afb7;align-self:start;margin-top:5px}
-@media(max-width:760px){
- #daily-ref-host{margin-top:14px}
- #daily-ref-host .r-grid{display:flex;flex-direction:column;gap:12px}
- #daily-ref-host .r-bottom{margin-top:12px}
- #daily-ref-host .r-card{width:100%;padding:12px;border-radius:13px}
- #daily-ref-host h3{font-size:13px}
- #daily-ref-host .r-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- #daily-ref-host .r-metric{min-height:76px;padding:9px;gap:8px}
- #daily-ref-host .r-micon{width:38px;height:38px;font-size:18px}
- #daily-ref-host .r-metric small{font-size:9px}
- #daily-ref-host .r-metric strong{font-size:22px}
- #daily-ref-host .conversion{grid-column:1/-1}
- #daily-ref-host .r-table,#daily-ref-host .r-ranking,#daily-ref-host .r-chart{overflow-x:auto;-webkit-overflow-scrolling:touch}
- #daily-ref-host .r-rank{min-width:500px}
- #daily-ref-host .r-bars{min-width:520px}
-}
+/* ===== NOVOS CARDS DO DIA — layout aprovado ===== */
+#cards-hoje-novos{margin-top:24px;font-family:'Inter',sans-serif;color:#f7f9fb}
+#cards-hoje-novos *{box-sizing:border-box}
+.dh-grid{display:grid;gap:14px}.dh-top{grid-template-columns:1.08fr .92fr}.dh-bottom{grid-template-columns:1fr 1fr;margin-top:14px}
+.dh-card{min-width:0;background:radial-gradient(circle at 10% 0,rgba(0,140,255,.09),transparent 35%),linear-gradient(145deg,#0b1720,#061018);border:1px solid #0878bd;border-radius:15px;padding:15px;box-shadow:0 12px 28px rgba(0,0,0,.28)}
+.dh-summary{border-color:#16a34a;background:radial-gradient(circle at 0 0,rgba(0,210,90,.15),transparent 38%),radial-gradient(circle at 100% 0,rgba(157,30,255,.18),transparent 40%),#081218}.dh-ranking{border-color:#14728e}.dh-evo{border-color:#1459d8;background:radial-gradient(circle at 100% 0,rgba(20,89,216,.18),transparent 42%),#07121c}
+.dh-card h2{font-size:15px;margin:0 0 13px;font-weight:900;letter-spacing:.1px;color:#fff}.dh-table,.dh-rtable{overflow:hidden;border-radius:11px;background:#071219;border:1px solid #153646}
+.dh-head,.dh-row{display:grid;grid-template-columns:1.5fr repeat(6,.72fr) .92fr;min-width:670px;align-items:center}.dh-head{background:linear-gradient(90deg,#16496b,#0d2a39);min-height:39px}.dh-head span{font-size:10px;color:#e7eef3;text-align:center}.dh-head span:first-child{text-align:left}.dh-row{min-height:42px;border-top:1px solid #16303c}.dh-row>*{padding:8px;text-align:center;font-size:11px}.dh-store{display:flex;align-items:center!important;text-align:left!important;font-weight:700}.dh-store i{width:18px;height:18px;border-radius:50%;margin-right:10px;box-shadow:0 0 10px rgba(255,255,255,.15)}.dh-row strong{font-size:13px}
+.dh-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.dh-metric{min-height:91px;border-radius:12px;border:1px solid #456172;padding:12px;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#172b3b,#0c1822)}.dh-icon{width:45px;height:45px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:900;flex:none;background:#1f5d91}.dh-metric span{font-size:11px;color:#f0f4f6}.dh-metric strong{display:block;font-size:26px;line-height:1;margin-top:5px}.m-vendas{border-color:#148dff;background:linear-gradient(135deg,#074a86,#082958)}.m-vendas .dh-icon{background:#078cff}.m-vendoes{border-color:#b11dff;background:linear-gradient(135deg,#531080,#260d42)}.m-vendoes .dh-icon{background:#9e19eb}.m-wpp{border-color:#00c95b;background:linear-gradient(135deg,#07582d,#07341d)}.m-wpp .dh-icon{background:#00c95b}.m-trocas{border-color:#e87b00;background:linear-gradient(135deg,#673105,#361b08)}.m-trocas .dh-icon{background:#f28b00}.m-sem{border-color:#ef1f3c;background:linear-gradient(135deg,#68111e,#390c14)}.m-sem .dh-icon{background:#ef1f3c}.m-conv{grid-column:1/-1;min-height:76px;border-color:#f0c400;background:linear-gradient(90deg,#5b4a00,#5d3000)}.m-conv .dh-icon{background:#ffd800;color:#161616}
+.dh-rhead,.dh-rank{display:grid;grid-template-columns:55px 1.5fr 1fr .72fr .72fr;align-items:center;min-width:520px}.dh-rhead{min-height:37px;background:linear-gradient(90deg,#16415b,#102531)}.dh-rhead span{font-size:10px;color:#dce5eb;padding:8px}.dh-rank{min-height:43px;border-top:1px solid #16303c}.dh-rank>*{padding:8px;font-size:11px}.dh-rank strong{font-size:12px}.dh-rank b{text-align:center}.dh-pos{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;padding:0!important;font-weight:900;background:#263746}.top1{background:linear-gradient(90deg,rgba(255,211,0,.40),rgba(255,211,0,.06))}.top1 .dh-pos{background:#ffd500;color:#111;box-shadow:0 0 16px rgba(255,213,0,.5)}.top2 .dh-pos{background:#d7e0e7;color:#18212a}.top3 .dh-pos{background:#f28b38;color:#1d1107}.dh-empty{padding:38px;text-align:center;color:#778995;font-size:11px}
+.dh-chart{height:270px;border:1px solid #173b59;border-radius:11px;background:repeating-linear-gradient(to top,rgba(77,122,155,.12) 0,rgba(77,122,155,.12) 1px,transparent 1px,transparent 52px),#06111a;padding:15px 12px 9px}.dh-bars{height:100%;display:flex;gap:7px;align-items:stretch;border-bottom:1px solid #31506a}.dh-barcol{flex:1;min-width:22px;display:grid;grid-template-rows:18px 1fr 22px;align-items:end;justify-items:center}.dh-barcol>b{font-size:9px}.dh-barbox{height:100%;width:100%;display:flex;align-items:flex-end;justify-content:center}.dh-barbox i{display:block;width:min(31px,72%);background:linear-gradient(#20b5ff,#075dff);border-radius:3px 3px 0 0;box-shadow:0 0 12px rgba(0,139,255,.32)}.dh-barcol span{font-size:8px;color:#c3cdd4;margin-top:5px}
+@media(max-width:780px){.dh-grid{display:flex;flex-direction:column}.dh-bottom{margin-top:12px}.dh-card{padding:11px}.dh-card h2{font-size:13px}.dh-table,.dh-rtable,.dh-chart{overflow-x:auto}.dh-metrics{grid-template-columns:repeat(2,1fr);gap:8px}.dh-metric{min-height:76px;padding:9px}.dh-metric strong{font-size:22px}.m-conv{grid-column:1/-1}.dh-head,.dh-row{min-width:650px}.dh-chart{height:230px}.dh-bars{min-width:520px}.dh-rhead,.dh-rank{min-width:500px}}
 
 </style>
 </head>
@@ -1611,9 +1245,8 @@ input,select,textarea{color-scheme:dark}
       <div class="total-grid">
         <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-total">—</div><div class="total-lbl">Total</div></div>
         <div class="total-item"><div class="total-num" style="color:var(--vd)" id="g-vendas">—</div><div class="total-lbl">Vendas</div></div>
-        <div class="total-item"><div class="total-num" style="color:#A855F7" id="g-vendoes">—</div><div class="total-lbl">Vendões</div></div>
-        <div class="total-item"><div class="total-num" style="color:#25D366" id="g-wpp">—</div><div class="total-lbl">WhatsApp</div></div>
-        <div class="total-item"><div class="total-num" style="color:#F97316" id="g-trocas">—</div><div class="total-lbl">Trocas</div></div>
+        <div class="total-item"><div class="total-num" style="color:#FFD700"   id="g-vendoes">—</div><div class="total-lbl">Vendões</div></div>
+        <div class="total-item"><div class="total-num" style="color:var(--az)" id="g-trocas">—</div><div class="total-lbl">Trocas</div></div>
         <div class="total-item"><div class="total-num" style="color:var(--vm)" id="g-saiu">—</div><div class="total-lbl">Sem venda</div></div>
         <div class="total-item"><div class="total-num" style="color:var(--am)" id="g-conv">—</div><div class="total-lbl">Conversão</div></div>
       </div>
@@ -1621,8 +1254,7 @@ input,select,textarea{color-scheme:dark}
     </div>
     <div class="section-title">Lojas — situação em tempo real</div>
     <div class="lojas-grid" id="lojas-grid"><div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div></div>
-
-    <div id="daily-ref-host"></div>
+    <div id="cards-hoje-novos"></div>
   </div>
 
   <!-- VIEW RANKING -->
