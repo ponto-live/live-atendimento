@@ -145,78 +145,100 @@ function renderTudo() {
 // ══════════════════ RESUMO VISUAL DO DIA ══════════════════
 // Usa somente os dados que o painel já recebe em tempo real do Firebase.
 function renderResumoDiario() {
-  const corpo = document.getElementById('hoje-lojas-body');
-  const resumo = document.getElementById('resumo-dia');
-  const ranking = document.getElementById('ranking-hoje-body');
-  const evolucao = document.getElementById('evolucao-dia');
-  if (!corpo || !resumo || !ranking || !evolucao) return;
+  const host = document.getElementById('daily-ref-host');
+  if (!host) return;
 
   let gt=0, gv=0, gvd=0, gw=0, gtr=0, gs=0;
   const statsVend = {};
   const porHora = {};
+  const cores = {azevedo:'#16A35B', praiamar:'#168BFF', miramar:'#FFD400', praiagrande:'#FF4B94', bioritmo:'#8D24E8'};
 
-  corpo.innerHTML = LOJAS.map(l => {
+  const rows = LOJAS.map(l => {
     const todos = dadosLojas[l.id]?.atend || [];
     const normais = todos.filter(a=>a.resultado!=='whatsapp');
-    const total = normais.length;
-    const vendas = normais.filter(a=>a.resultado==='venda').length;
-    const vendoes = normais.filter(a=>a.resultado==='vendao').length;
-    const wpp = todos.filter(a=>a.resultado==='whatsapp').length;
-    const trocas = normais.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
-    const saiu = normais.filter(a=>a.resultado==='saiu').length;
-    const conv = total ? Math.round(((vendas+vendoes)/total)*100) : 0;
+    const total=normais.length;
+    const vendas=normais.filter(a=>a.resultado==='venda').length;
+    const vendoes=normais.filter(a=>a.resultado==='vendao').length;
+    const wpp=todos.filter(a=>a.resultado==='whatsapp').length;
+    const trocas=normais.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
+    const saiu=normais.filter(a=>a.resultado==='saiu').length;
+    const conv=total?Math.round(((vendas+vendoes)/total)*100):0;
     gt+=total; gv+=vendas; gvd+=vendoes; gw+=wpp; gtr+=trocas; gs+=saiu;
 
-    todos.forEach(a => {
-      if (a.resultado !== 'whatsapp' && a.vendedora) {
-        if (!statsVend[a.vendedora]) statsVend[a.vendedora] = {loja:l.nome, atend:0, vendas:0};
+    todos.forEach(a=>{
+      if(a.resultado!=='whatsapp' && a.vendedora){
+        if(!statsVend[a.vendedora]) statsVend[a.vendedora]={loja:l.nome,atend:0,vendas:0};
         statsVend[a.vendedora].atend++;
-        if (a.resultado==='venda' || a.resultado==='vendao') statsVend[a.vendedora].vendas++;
+        if(a.resultado==='venda'||a.resultado==='vendao') statsVend[a.vendedora].vendas++;
       }
-      if (a.resultado !== 'whatsapp' && a.hora) {
-        const h = parseInt(String(a.hora).split(':')[0],10);
-        if (!Number.isNaN(h)) porHora[h]=(porHora[h]||0)+1;
+      if(a.resultado!=='whatsapp' && a.hora){
+        const h=parseInt(String(a.hora).split(':')[0],10);
+        if(!Number.isNaN(h)) porHora[h]=(porHora[h]||0)+1;
       }
     });
 
-    return `<tr>
-      <td><span class="loja-dot loja-dot-${l.id}"></span>${l.nome}</td>
-      <td>${total}</td><td>${vendas}</td><td>${vendoes}</td><td>${wpp}</td>
-      <td>${trocas}</td><td>${saiu}</td><td class="conv-cell">${conv}%</td>
-    </tr>`;
+    return `<div class="r-row">
+      <div class="r-loja"><i style="background:${cores[l.id]||'#888'}"></i>${l.nome}</div>
+      <div>${total}</div><div>${vendas}</div><div>${vendoes}</div><div>${wpp}</div>
+      <div>${trocas}</div><div>${saiu}</div><div class="r-conv">${conv}%</div>
+    </div>`;
   }).join('');
 
-  const convG = gt ? Math.round(((gv+gvd)/gt)*100) : 0;
-  resumo.innerHTML = `
-    <div class="metric-card metric-total"><span class="metric-icon">👥</span><span class="metric-copy"><small>Total</small><strong>${gt}</strong></span></div>
-    <div class="metric-card metric-venda"><span class="metric-icon">🛍️</span><span class="metric-copy"><small>Vendas</small><strong>${gv}</strong></span></div>
-    <div class="metric-card metric-vendao"><span class="metric-icon">💎</span><span class="metric-copy"><small>Vendões</small><strong>${gvd}</strong></span></div>
-    <div class="metric-card metric-wpp"><span class="metric-icon">●</span><span class="metric-copy"><small>WhatsApp</small><strong>${gw}</strong></span></div>
-    <div class="metric-card metric-troca"><span class="metric-icon">↔</span><span class="metric-copy"><small>Trocas</small><strong>${gtr}</strong></span></div>
-    <div class="metric-card metric-sem"><span class="metric-icon">✕</span><span class="metric-copy"><small>Sem venda</small><strong>${gs}</strong></span></div>
-    <div class="metric-card metric-conv"><span class="metric-icon">%</span><span class="metric-copy"><small>Conversão</small><strong>${convG}%</strong></span></div>`;
+  const convG=gt?Math.round(((gv+gvd)/gt)*100):0;
+  const metric=(cls,icon,label,val)=>`<div class="r-metric ${cls}">
+    <div class="r-micon">${icon}</div><div><small>${label}</small><strong>${val}</strong></div>
+  </div>`;
 
-  const ord = Object.entries(statsVend)
-    .sort((a,b)=>b[1].vendas-a[1].vendas || b[1].atend-a[1].atend)
-    .slice(0,10);
-  ranking.innerHTML = ord.length ? ord.map(([nome,s],i)=>`
-    <tr class="${i===0?'rank-first':''}">
-      <td><span class="rank-medal">${i+1}º</span></td><td><strong>${nome}</strong></td><td>${s.loja}</td>
-      <td>${s.atend}</td><td class="vendas-cell">${s.vendas}</td>
-    </tr>`).join('')
-    : `<tr><td colspan="5"><div class="daily-empty">🏆<br>Nenhum registro ainda.</div></td></tr>`;
+  const ord=Object.entries(statsVend).sort((a,b)=>b[1].vendas-a[1].vendas||b[1].atend-a[1].atend).slice(0,8);
+  const ranks=ord.length?ord.map(([nome,s],i)=>`<div class="r-rank ${i===0?'first':''}">
+    <div>${i+1}</div><div class="r-name">${nome}</div><div>${s.loja}</div><div>${s.atend}</div><div>${s.vendas}</div>
+  </div>`).join(''):`<div class="r-empty">Nenhum registro ainda.</div>`;
 
-  // Activity by hour (not cumulative), displayed from 08h to 21h.
-  const serie = [];
-  for (let h=8; h<=21; h++) serie.push({h, v:porHora[h]||0});
-  const maxV = Math.max(...serie.map(x=>x.v), 1);
-  evolucao.innerHTML = `<div class="chart-y"><span>${maxV}</span><span>${Math.ceil(maxV/2)}</span><span>0</span></div>
-    <div class="evolucao-bars">${serie.map(x=>`
-      <div class="evo-col">
-        <div class="evo-num">${x.v}</div>
-        <div class="evo-bar-wrap"><div class="evo-bar" style="height:${x.v===0?0:Math.max(10,(x.v/maxV)*100)}%"></div></div>
-        <div class="evo-hora">${String(x.h).padStart(2,'0')}h</div>
-      </div>`).join('')}</div>`;
+  const serie=[]; for(let h=8;h<=21;h++) serie.push({h,v:porHora[h]||0});
+  const maxV=Math.max(...serie.map(x=>x.v),1);
+  const bars=serie.map(x=>`<div class="r-bcol">
+    <span>${x.v}</span><div class="r-barea"><b style="height:${x.v?Math.max(7,(x.v/maxV)*100):0}%"></b></div>
+    <em>${String(x.h).padStart(2,'0')}h</em>
+  </div>`).join('');
+
+  host.innerHTML = `
+  <div class="r-grid r-top">
+    <section class="r-card">
+      <h3>📋 ATENDIMENTOS DO DIA</h3>
+      <div class="r-table">
+        <div class="r-head"><div>Loja</div><div>Total</div><div>Vendas</div><div>Vendões</div><div>WhatsApp</div><div>Trocas</div><div>Sem venda</div><div>Conversão</div></div>
+        ${rows}
+      </div>
+    </section>
+    <section class="r-card">
+      <h3>📊 RESUMO DO DIA</h3>
+      <div class="r-metrics">
+        ${metric('neutral','👥','Total',gt)}
+        ${metric('sale','▣','Vendas',gv)}
+        ${metric('big','◆','Vendões',gvd)}
+        ${metric('wpp','●','WhatsApp',gw)}
+        ${metric('trade','↔','Trocas',gtr)}
+        ${metric('lost','✕','Sem venda',gs)}
+        ${metric('conversion','%','Conversão',convG+'%')}
+      </div>
+    </section>
+  </div>
+  <div class="r-grid r-bottom">
+    <section class="r-card">
+      <h3>🏆 RANKING DE VENDEDORAS (HOJE)</h3>
+      <div class="r-ranking">
+        <div class="r-rank r-rhead"><div>#</div><div>Vendedora</div><div>Loja</div><div>Atend.</div><div>Vendas</div></div>
+        ${ranks}
+      </div>
+    </section>
+    <section class="r-card">
+      <h3>📈 EVOLUÇÃO DO DIA</h3>
+      <div class="r-chart">
+        <div class="r-y"><span>${maxV}</span><span>${Math.ceil(maxV*.66)}</span><span>${Math.ceil(maxV*.33)}</span><span>0</span></div>
+        <div class="r-bars">${bars}</div>
+      </div>
+    </section>
+  </div>`;
 }
 
 // ══════════════════ ANÁLISE MENSAL ══════════════════
@@ -1422,6 +1444,75 @@ input,select,textarea{color-scheme:dark}
  #view-hoje .evolucao-dia{height:220px!important;padding:12px 8px!important;overflow-x:auto!important}
  #view-hoje .evolucao-bars{min-width:520px!important;gap:3px!important}
  #view-hoje .evo-hora{font-size:7px!important}
+}
+
+
+/* ==========================================================
+   BLOCO DIÁRIO ISOLADO — baseado diretamente na referência
+   Prefixo r- evita conflito com o CSS antigo do painel.
+   ========================================================== */
+#daily-ref-host{all:initial;display:block;font-family:Arial,sans-serif;color:#f4f7f9;margin-top:24px}
+#daily-ref-host *{box-sizing:border-box}
+#daily-ref-host .r-grid{display:grid;gap:12px;width:100%}
+#daily-ref-host .r-top{grid-template-columns:minmax(0,1.75fr) minmax(300px,.9fr)}
+#daily-ref-host .r-bottom{grid-template-columns:1.08fr .92fr;margin-top:12px}
+#daily-ref-host .r-card{background:linear-gradient(180deg,#101920,#0b1217);border:1px solid #233640;border-radius:12px;padding:12px;min-width:0;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#daily-ref-host h3{margin:0 0 10px;font-size:12px;line-height:1.2;font-weight:900;color:#f6f8fa}
+
+#daily-ref-host .r-table{background:#081116;border:1px solid #1d2d36;border-radius:8px;overflow:hidden}
+#daily-ref-host .r-head,#daily-ref-host .r-row{display:grid;grid-template-columns:1.5fr repeat(6,.72fr) .9fr;align-items:center;min-width:620px}
+#daily-ref-host .r-head{background:#14212a;color:#b9c4cb;font-size:8px}
+#daily-ref-host .r-row{font-size:10px;color:#edf2f5;border-top:1px solid #19272f}
+#daily-ref-host .r-head>div,#daily-ref-host .r-row>div{padding:7px 8px;text-align:center;white-space:nowrap}
+#daily-ref-host .r-head>div:first-child,#daily-ref-host .r-row>div:first-child{text-align:left}
+#daily-ref-host .r-loja{font-weight:600;display:flex;align-items:center}
+#daily-ref-host .r-loja i{width:12px;height:12px;border-radius:50%;margin-right:8px;flex:none}
+#daily-ref-host .r-conv{font-weight:900}
+
+#daily-ref-host .r-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#daily-ref-host .r-metric{min-height:58px;border:1px solid #40505b;border-radius:8px;background:#151e25;padding:8px;display:flex;align-items:center;gap:8px}
+#daily-ref-host .r-micon{width:31px;height:31px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:16px;font-weight:900;background:#59656f;color:#fff}
+#daily-ref-host .r-metric small{display:block;font-size:8px;color:#d7dde1;white-space:nowrap}
+#daily-ref-host .r-metric strong{display:block;font-size:18px;line-height:1.05;color:#fff;margin-top:2px}
+#daily-ref-host .sale{border-color:#087fe0;background:linear-gradient(135deg,#092b4c,#101a22)} #daily-ref-host .sale .r-micon{background:#087fea}
+#daily-ref-host .big{border-color:#8225ce;background:linear-gradient(135deg,#2c1043,#17121c)} #daily-ref-host .big .r-micon{background:#8b20d9}
+#daily-ref-host .wpp{border-color:#0aa24b;background:linear-gradient(135deg,#07391f,#0b1e14)} #daily-ref-host .wpp .r-micon{background:#00b94f}
+#daily-ref-host .trade{border-color:#b86a00;background:linear-gradient(135deg,#3a2207,#21170d)} #daily-ref-host .trade .r-micon{background:#e48700}
+#daily-ref-host .lost{border-color:#b82c33;background:linear-gradient(135deg,#3a1115,#211013)} #daily-ref-host .lost .r-micon{background:#e9363d}
+#daily-ref-host .conversion{grid-column:1/-1;min-height:51px;border-color:#a88700;background:linear-gradient(90deg,#392f07,#17160c)}
+#daily-ref-host .conversion .r-micon{background:#f5c800;color:#111}
+
+#daily-ref-host .r-ranking{background:#081116;border:1px solid #1d2d36;border-radius:8px;overflow:hidden}
+#daily-ref-host .r-rank{display:grid;grid-template-columns:34px 1.35fr 1fr .65fr .65fr;align-items:center;min-height:32px;padding:0 8px;font-size:10px;border-top:1px solid #19272f}
+#daily-ref-host .r-rhead{background:#14212a;color:#b9c4cb;border-top:0;font-size:8px;min-height:29px}
+#daily-ref-host .r-rank>div:not(:nth-child(2)):not(:nth-child(3)){text-align:center}
+#daily-ref-host .r-name{font-weight:800}
+#daily-ref-host .r-rank.first{background:linear-gradient(90deg,rgba(245,200,0,.20),rgba(245,200,0,.03))}
+#daily-ref-host .r-empty{text-align:center;padding:35px;color:#7e8b95;font-size:10px}
+
+#daily-ref-host .r-chart{height:190px;background:#081116;border:1px solid #1d2d36;border-radius:8px;padding:10px;display:grid;grid-template-columns:22px 1fr}
+#daily-ref-host .r-y{display:flex;flex-direction:column;justify-content:space-between;padding:0 4px 19px 0;font-size:7px;color:#7f8d97;text-align:right}
+#daily-ref-host .r-bars{display:flex;gap:4px;border-left:1px solid #263640;border-bottom:1px solid #263640;background:repeating-linear-gradient(to top,transparent 0,transparent 36px,rgba(255,255,255,.04) 37px)}
+#daily-ref-host .r-bcol{flex:1;min-width:17px;display:grid;grid-template-rows:14px 1fr 18px;justify-items:center;align-items:end}
+#daily-ref-host .r-bcol>span{font-size:7px;color:#e8edf1}
+#daily-ref-host .r-barea{height:100%;width:100%;display:flex;align-items:flex-end;justify-content:center}
+#daily-ref-host .r-barea b{display:block;width:min(24px,72%);background:linear-gradient(180deg,#35a7ff,#0879de);border-radius:2px 2px 0 0;box-shadow:0 0 8px rgba(22,139,255,.2)}
+#daily-ref-host .r-bcol em{font-style:normal;font-size:7px;color:#87949e;align-self:start;margin-top:4px}
+
+@media(max-width:760px){
+ #daily-ref-host{margin-top:14px}
+ #daily-ref-host .r-grid{display:flex;flex-direction:column;gap:11px}
+ #daily-ref-host .r-bottom{margin-top:11px}
+ #daily-ref-host .r-card{width:100%;padding:10px;border-radius:11px}
+ #daily-ref-host h3{font-size:11px}
+ #daily-ref-host .r-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ #daily-ref-host .r-metric{min-height:58px;padding:7px}
+ #daily-ref-host .conversion{grid-column:1/-1}
+ #daily-ref-host .r-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ #daily-ref-host .r-ranking{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ #daily-ref-host .r-rank{min-width:470px}
+ #daily-ref-host .r-chart{height:205px;overflow-x:auto}
+ #daily-ref-host .r-bars{min-width:500px}
 }
 
 </style>
