@@ -155,7 +155,7 @@ function renderResumoDiario() {
   const statsVend = {};
   const porHora = {};
 
-  const linhas = LOJAS.map(l => {
+  corpo.innerHTML = LOJAS.map(l => {
     const todos = dadosLojas[l.id]?.atend || [];
     const normais = todos.filter(a=>a.resultado!=='whatsapp');
     const total = normais.length;
@@ -182,42 +182,41 @@ function renderResumoDiario() {
     return `<tr>
       <td><span class="loja-dot loja-dot-${l.id}"></span>${l.nome}</td>
       <td>${total}</td><td>${vendas}</td><td>${vendoes}</td><td>${wpp}</td>
-      <td>${trocas}</td><td>${saiu}</td><td><strong>${total?conv+'%':'0%'}</strong></td>
+      <td>${trocas}</td><td>${saiu}</td><td class="conv-cell">${conv}%</td>
     </tr>`;
   }).join('');
-  corpo.innerHTML = linhas;
 
   const convG = gt ? Math.round(((gv+gvd)/gt)*100) : 0;
   resumo.innerHTML = `
-    <div><span>👥 Total</span><strong>${gt}</strong></div>
-    <div><span>🛍️ Vendas</span><strong class="azul">${gv}</strong></div>
-    <div><span>💎 Vendões</span><strong class="roxo">${gvd}</strong></div>
-    <div><span>🟢 WhatsApp</span><strong class="verde">${gw}</strong></div>
-    <div><span>🔄 Trocas</span><strong class="laranja">${gtr}</strong></div>
-    <div><span>❌ Sem venda</span><strong class="vermelho">${gs}</strong></div>
-    <div><span>🟡 Conversão</span><strong>${convG}%</strong></div>`;
+    <div class="metric-card metric-total"><span class="metric-icon">👥</span><span class="metric-copy"><small>Total</small><strong>${gt}</strong></span></div>
+    <div class="metric-card metric-venda"><span class="metric-icon">🛍️</span><span class="metric-copy"><small>Vendas</small><strong>${gv}</strong></span></div>
+    <div class="metric-card metric-vendao"><span class="metric-icon">💎</span><span class="metric-copy"><small>Vendões</small><strong>${gvd}</strong></span></div>
+    <div class="metric-card metric-wpp"><span class="metric-icon">●</span><span class="metric-copy"><small>WhatsApp</small><strong>${gw}</strong></span></div>
+    <div class="metric-card metric-troca"><span class="metric-icon">↔</span><span class="metric-copy"><small>Trocas</small><strong>${gtr}</strong></span></div>
+    <div class="metric-card metric-sem"><span class="metric-icon">✕</span><span class="metric-copy"><small>Sem venda</small><strong>${gs}</strong></span></div>
+    <div class="metric-card metric-conv"><span class="metric-icon">%</span><span class="metric-copy"><small>Conversão</small><strong>${convG}%</strong></span></div>`;
 
   const ord = Object.entries(statsVend)
     .sort((a,b)=>b[1].vendas-a[1].vendas || b[1].atend-a[1].atend)
     .slice(0,10);
   ranking.innerHTML = ord.length ? ord.map(([nome,s],i)=>`
-    <tr><td>${i+1}</td><td><strong>${nome}</strong></td><td>${s.loja}</td>
-    <td>${s.atend}</td><td class="vendas-cell">${s.vendas}</td></tr>`).join('')
+    <tr class="${i===0?'rank-first':''}">
+      <td><span class="rank-medal">${i+1}º</span></td><td><strong>${nome}</strong></td><td>${s.loja}</td>
+      <td>${s.atend}</td><td class="vendas-cell">${s.vendas}</td>
+    </tr>`).join('')
     : `<tr><td colspan="5"><div class="daily-empty">🏆<br>Nenhum registro ainda.</div></td></tr>`;
 
-  const horas = Object.keys(porHora).map(Number).sort((a,b)=>a-b);
-  if (!horas.length) {
-    evolucao.innerHTML = `<div class="daily-empty">📈<br>Sem dados para exibir.</div>`;
-  } else {
-    const minH = Math.min(...horas), maxH = Math.max(...horas);
-    const serie = [];
-    let acum = 0;
-    for (let h=minH; h<=maxH; h++) { acum += porHora[h]||0; serie.push({h, v:acum}); }
-    const maxV = Math.max(...serie.map(x=>x.v),1);
-    evolucao.innerHTML = `<div class="evolucao-bars">${serie.map(x=>`
-      <div class="evo-col"><div class="evo-num">${x.v}</div><div class="evo-bar" style="height:${Math.max(8,(x.v/maxV)*100)}%"></div><div class="evo-hora">${String(x.h).padStart(2,'0')}h</div></div>
-    `).join('')}</div>`;
-  }
+  // Activity by hour (not cumulative), displayed from 08h to 21h.
+  const serie = [];
+  for (let h=8; h<=21; h++) serie.push({h, v:porHora[h]||0});
+  const maxV = Math.max(...serie.map(x=>x.v), 1);
+  evolucao.innerHTML = `<div class="chart-y"><span>${maxV}</span><span>${Math.ceil(maxV/2)}</span><span>0</span></div>
+    <div class="evolucao-bars">${serie.map(x=>`
+      <div class="evo-col">
+        <div class="evo-num">${x.v}</div>
+        <div class="evo-bar-wrap"><div class="evo-bar" style="height:${x.v===0?0:Math.max(10,(x.v/maxV)*100)}%"></div></div>
+        <div class="evo-hora">${String(x.h).padStart(2,'0')}h</div>
+      </div>`).join('')}</div>`;
 }
 
 // ══════════════════ ANÁLISE MENSAL ══════════════════
@@ -1354,6 +1353,77 @@ input,select,textarea{color-scheme:dark}
   .top-daily,.bottom-daily{grid-template-columns:1fr!important}
 }
 
+
+/* ===== PAINEL HOJE — acabamento final baseado na referência aprovada ===== */
+#view-hoje .daily-grid{display:grid!important;gap:16px!important;width:100%!important}
+#view-hoje .top-daily{grid-template-columns:minmax(0,2fr) minmax(320px,.9fr)!important;margin-top:26px!important}
+#view-hoje .bottom-daily{grid-template-columns:1.05fr .95fr!important;margin-top:16px!important}
+#view-hoje .daily-panel{
+ background:linear-gradient(145deg,#101820,#0B1217)!important;border:1px solid #263641!important;
+ border-radius:14px!important;padding:15px!important;box-shadow:0 10px 28px rgba(0,0,0,.24)!important;min-width:0!important
+}
+#view-hoje .daily-title{font-size:13px!important;font-weight:900!important;color:#F7F9FA!important;margin:0 0 12px!important}
+#view-hoje .daily-table-wrap{background:#091116!important;border:1px solid #21313B!important;border-radius:10px!important;overflow-x:auto!important}
+#view-hoje .daily-table{width:100%!important;min-width:650px!important;border-collapse:collapse!important;font-size:11px!important}
+#view-hoje .daily-table th{background:#15212A!important;color:#BFC9D0!important;font-size:9px!important;padding:8px 10px!important}
+#view-hoje .daily-table td{padding:8px 10px!important;border-top:1px solid #1B2932!important;color:#EEF3F6!important}
+#view-hoje .daily-table td:first-child{font-weight:600!important}
+#view-hoje .conv-cell{font-weight:900!important}
+#view-hoje .loja-dot{width:13px!important;height:13px!important;margin-right:8px!important}
+
+#view-hoje .resumo-dia{
+ display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;
+ background:transparent!important;border:0!important;border-radius:0!important;overflow:visible!important
+}
+#view-hoje .metric-card{
+ min-height:72px!important;border-radius:10px!important;padding:10px!important;display:flex!important;align-items:center!important;
+ gap:10px!important;border:1px solid #33414B!important;background:#151D24!important;box-shadow:inset 0 0 18px rgba(255,255,255,.015)!important
+}
+#view-hoje .metric-icon{width:34px!important;height:34px!important;border-radius:50%!important;display:grid!important;place-items:center!important;font-size:19px!important;font-weight:900!important;flex:0 0 34px!important}
+#view-hoje .metric-copy{display:flex!important;flex-direction:column!important;min-width:0!important}
+#view-hoje .metric-copy small{font-size:9px!important;color:#D5DCE1!important;line-height:1.1!important;white-space:nowrap!important}
+#view-hoje .metric-copy strong{font-size:22px!important;line-height:1.05!important;color:#fff!important;margin-top:3px!important}
+#view-hoje .metric-total{border-color:#43515C!important}.metric-total .metric-icon{background:#56616B!important}
+#view-hoje .metric-venda{border-color:#086FD1!important;background:linear-gradient(135deg,#092642,#0C1B29)!important}.metric-venda .metric-icon{background:#087FEA!important}
+#view-hoje .metric-vendao{border-color:#7E22CE!important;background:linear-gradient(135deg,#28103C,#171021)!important}.metric-vendao .metric-icon{background:#8B20D9!important}
+#view-hoje .metric-wpp{border-color:#0C9D48!important;background:linear-gradient(135deg,#07351D,#0A1E14)!important}.metric-wpp .metric-icon{background:#00B94F!important}
+#view-hoje .metric-troca{border-color:#B96B00!important;background:linear-gradient(135deg,#3A2106,#20170C)!important}.metric-troca .metric-icon{background:#E48700!important}
+#view-hoje .metric-sem{border-color:#B72B31!important;background:linear-gradient(135deg,#3A1114,#211012)!important}.metric-sem .metric-icon{background:#E9363D!important}
+#view-hoje .metric-conv{grid-column:1/-1!important;min-height:62px!important;border-color:#A88700!important;background:linear-gradient(90deg,#3A3008,#1A180D)!important}.metric-conv .metric-icon{background:#F5C800!important;color:#111!important}
+
+#view-hoje .ranking-hoje{min-width:520px!important}
+#view-hoje .rank-first{background:linear-gradient(90deg,rgba(245,200,0,.19),rgba(245,200,0,.04))!important}
+#view-hoje .rank-medal{display:inline-grid!important;place-items:center!important;min-width:30px!important;height:30px!important;border-radius:50%!important;background:#D8DEE3!important;color:#26313A!important;font-weight:900!important}
+#view-hoje .rank-first .rank-medal{background:#F5C800!important;color:#111!important;box-shadow:0 0 14px rgba(245,200,0,.28)!important}
+#view-hoje .vendas-cell{color:#fff!important;font-weight:900!important}
+
+#view-hoje .evolucao-dia{height:260px!important;padding:18px 14px!important;display:flex!important;align-items:stretch!important;background:#091116!important;border:1px solid #21313B!important}
+#view-hoje .chart-y{width:24px!important;display:flex!important;flex-direction:column!important;justify-content:space-between!important;color:#84929D!important;font-size:8px!important;padding:4px 0 21px!important}
+#view-hoje .evolucao-bars{flex:1!important;height:auto!important;display:flex!important;align-items:stretch!important;gap:5px!important;border-left:1px solid #263641!important;border-bottom:1px solid #263641!important;padding:0 4px!important;background:repeating-linear-gradient(to top,transparent 0,transparent 49px,rgba(255,255,255,.035) 50px)!important}
+#view-hoje .evo-col{height:100%!important;flex:1!important;min-width:20px!important;display:grid!important;grid-template-rows:18px 1fr 20px!important;align-items:end!important;justify-items:center!important}
+#view-hoje .evo-bar-wrap{height:100%!important;width:100%!important;display:flex!important;align-items:flex-end!important;justify-content:center!important}
+#view-hoje .evo-bar{width:min(28px,75%)!important;background:linear-gradient(180deg,#35A5FF,#0878DE)!important;border-radius:2px 2px 0 0!important;box-shadow:0 0 10px rgba(22,139,255,.16)!important}
+#view-hoje .evo-num{font-size:8px!important;color:#E9EEF2!important;margin:0!important;align-self:end!important}
+#view-hoje .evo-hora{font-size:8px!important;color:#87949E!important;margin:5px 0 0!important;align-self:start!important}
+
+@media(max-width:760px){
+ #view-hoje .daily-grid,#view-hoje .top-daily,#view-hoje .bottom-daily{display:flex!important;flex-direction:column!important;gap:12px!important;width:100%!important;margin-top:14px!important}
+ #view-hoje .daily-panel{width:100%!important;max-width:100%!important;padding:12px!important;border-radius:12px!important}
+ #view-hoje .daily-title{font-size:12px!important}
+ #view-hoje .resumo-dia{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+ #view-hoje .metric-card{min-height:65px!important;padding:8px!important;gap:8px!important}
+ #view-hoje .metric-icon{width:30px!important;height:30px!important;flex-basis:30px!important;font-size:16px!important}
+ #view-hoje .metric-copy small{font-size:8px!important}
+ #view-hoje .metric-copy strong{font-size:19px!important}
+ #view-hoje .metric-conv{grid-column:1/-1!important}
+ #view-hoje .daily-table{font-size:10px!important}
+ #view-hoje .daily-table-wrap{width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
+ #view-hoje .ranking-hoje{min-width:470px!important}
+ #view-hoje .evolucao-dia{height:220px!important;padding:12px 8px!important;overflow-x:auto!important}
+ #view-hoje .evolucao-bars{min-width:520px!important;gap:3px!important}
+ #view-hoje .evo-hora{font-size:7px!important}
+}
+
 </style>
 </head>
 <body>
@@ -1395,7 +1465,7 @@ input,select,textarea{color-scheme:dark}
     <div class="section-title">Lojas — situação em tempo real</div>
     <div class="lojas-grid" id="lojas-grid"><div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div></div>
 
-    <div class="daily-grid top-daily" style="display:grid;grid-template-columns:minmax(0,2.15fr) minmax(290px,.85fr);gap:16px;margin-top:26px;width:100%">
+    <div class="daily-grid top-daily">
       <section class="daily-panel daily-atend" style="display:block;background:#101820;border:1px solid #263540;border-radius:14px;padding:16px;min-width:0;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.22)">
         <div class="daily-title" style="display:flex;align-items:center;margin:0 0 13px;color:#F5F7F9;font-size:13px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.15px">📋 Atendimentos do dia</div>
         <div class="daily-table-wrap" style="display:block;width:100%;overflow-x:auto;border:1px solid #22313C;border-radius:10px;background:#0A1116">
@@ -1411,7 +1481,7 @@ input,select,textarea{color-scheme:dark}
       </section>
     </div>
 
-    <div class="daily-grid bottom-daily" style="display:grid;grid-template-columns:1.15fr .85fr;gap:16px;margin-top:16px;width:100%">
+    <div class="daily-grid bottom-daily">
       <section class="daily-panel" style="display:block;background:#101820;border:1px solid #263540;border-radius:14px;padding:16px;min-width:0;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.22)">
         <div class="daily-title" style="display:flex;align-items:center;margin:0 0 13px;color:#F5F7F9;font-size:13px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.15px">🏆 Ranking de vendedoras (hoje)</div>
         <div class="daily-table-wrap" style="display:block;width:100%;overflow-x:auto;border:1px solid #22313C;border-radius:10px;background:#0A1116">
