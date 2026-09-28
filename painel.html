@@ -1515,6 +1515,72 @@ input,select,textarea{color-scheme:dark}
  #daily-ref-host .r-bars{min-width:500px}
 }
 
+
+/* CARDS COLORIDOS — REFERÊNCIA APROVADA */
+#daily-ref-host{all:initial;display:block;font-family:Arial,sans-serif;color:#f5f7fa;margin-top:24px}
+#daily-ref-host *{box-sizing:border-box}
+#daily-ref-host .r-grid{display:grid;gap:14px;width:100%}
+#daily-ref-host .r-top{grid-template-columns:minmax(0,1.7fr) minmax(360px,.95fr)}
+#daily-ref-host .r-bottom{grid-template-columns:1fr 1fr;margin-top:14px}
+#daily-ref-host .r-card{background:linear-gradient(145deg,#0d1821,#071017);border:1px solid #0d668f;border-radius:16px;padding:15px;min-width:0;box-shadow:0 10px 28px rgba(0,0,0,.30),inset 0 0 28px rgba(0,140,255,.035)}
+#daily-ref-host .r-top .r-card:nth-child(2){border-color:#168c43;box-shadow:0 10px 28px rgba(0,0,0,.30),inset 0 0 34px rgba(0,210,90,.05)}
+#daily-ref-host .r-bottom .r-card:first-child{border-color:#426d31}
+#daily-ref-host .r-bottom .r-card:last-child{border-color:#1555a5}
+#daily-ref-host h3{margin:0 0 12px;font-size:15px;line-height:1.2;font-weight:900;color:#f8fafc}
+#daily-ref-host .r-table{background:#071118;border:1px solid #173442;border-radius:11px;overflow:hidden}
+#daily-ref-host .r-head,#daily-ref-host .r-row{display:grid;grid-template-columns:1.55fr repeat(6,.72fr) .9fr;align-items:center;min-width:650px}
+#daily-ref-host .r-head{background:linear-gradient(180deg,#18374b,#112b3a);color:#e1e8ed;font-size:10px;font-weight:700}
+#daily-ref-host .r-row{font-size:12px;color:#f0f4f7;border-top:1px solid #17303b;min-height:40px}
+#daily-ref-host .r-head>div,#daily-ref-host .r-row>div{padding:9px;text-align:center;white-space:nowrap}
+#daily-ref-host .r-head>div:first-child,#daily-ref-host .r-row>div:first-child{text-align:left}
+#daily-ref-host .r-loja{font-weight:700;display:flex;align-items:center}
+#daily-ref-host .r-loja i{width:17px;height:17px;border-radius:50%;margin-right:10px;flex:none}
+#daily-ref-host .r-conv{font-size:14px;font-weight:900}
+#daily-ref-host .r-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#daily-ref-host .r-metric{min-height:86px;border:1px solid #435362;border-radius:12px;background:linear-gradient(135deg,#17232d,#101820);padding:12px;display:flex;align-items:center;gap:11px}
+#daily-ref-host .r-micon{width:45px;height:45px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:22px;font-weight:900;background:#59656f;color:#fff}
+#daily-ref-host .r-metric small{display:block;font-size:11px;color:#eef2f5;white-space:nowrap}
+#daily-ref-host .r-metric strong{display:block;font-size:26px;line-height:1;color:#fff;margin-top:5px}
+#daily-ref-host .sale{border-color:#087fea;background:linear-gradient(135deg,#073967,#09213a)} #daily-ref-host .sale .r-micon{background:#087fea}
+#daily-ref-host .big{border-color:#a225e5;background:linear-gradient(135deg,#42115e,#21102f)} #daily-ref-host .big .r-micon{background:#9b20df}
+#daily-ref-host .wpp{border-color:#00b94f;background:linear-gradient(135deg,#064d26,#092b1a)} #daily-ref-host .wpp .r-micon{background:#00c957}
+#daily-ref-host .trade{border-color:#d27700;background:linear-gradient(135deg,#542a05,#2c1b0c)} #daily-ref-host .trade .r-micon{background:#ef8b00}
+#daily-ref-host .lost{border-color:#d9273c;background:linear-gradient(135deg,#52121b,#2d1015)} #daily-ref-host .lost .r-micon{background:#f12f43}
+#daily-ref-host .conversion{grid-column:1/-1;min-height:74px;border-color:#d1a900;background:linear-gradient(90deg,#594708,#2a250d)}
+#daily-ref-host .conversion .r-micon{background:#ffd400;color:#151515}
+#daily-ref-host .r-ranking{background:#071118;border:1px solid #203846;border-radius:11px;overflow:hidden}
+#daily-ref-host .r-rank{display:grid;grid-template-columns:52px 1.45fr 1fr .7fr .7fr;align-items:center;min-height:44px;padding:0 10px;font-size:12px;border-top:1px solid #1a303a}
+#daily-ref-host .r-rhead{background:linear-gradient(180deg,#182a35,#111e27);color:#cdd6dc;border-top:0;font-size:10px;min-height:36px}
+#daily-ref-host .r-rank>div:not(:nth-child(2)):not(:nth-child(3)){text-align:center}
+#daily-ref-host .r-name{font-size:13px;font-weight:900}
+#daily-ref-host .r-rank.first{background:linear-gradient(90deg,rgba(255,205,0,.34),rgba(255,205,0,.08))}
+#daily-ref-host .r-rank.first>div:first-child{color:#111;background:#ffd400;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;font-weight:900}
+#daily-ref-host .r-empty{text-align:center;padding:38px;color:#7e8b95;font-size:11px}
+#daily-ref-host .r-chart{height:235px;background:#071118;border:1px solid #1b3850;border-radius:11px;padding:12px;display:grid;grid-template-columns:28px 1fr}
+#daily-ref-host .r-y{display:flex;flex-direction:column;justify-content:space-between;padding:0 5px 22px 0;font-size:9px;color:#91a0aa;text-align:right}
+#daily-ref-host .r-bars{display:flex;gap:6px;border-left:1px solid #244050;border-bottom:1px solid #244050;background:repeating-linear-gradient(to top,transparent 0,transparent 43px,rgba(110,160,190,.10) 44px)}
+#daily-ref-host .r-bcol{flex:1;min-width:18px;display:grid;grid-template-rows:18px 1fr 21px;justify-items:center;align-items:end}
+#daily-ref-host .r-bcol>span{font-size:9px;color:#f1f5f8;font-weight:800}
+#daily-ref-host .r-barea{height:100%;width:100%;display:flex;align-items:flex-end;justify-content:center}
+#daily-ref-host .r-barea b{display:block;width:min(31px,75%);background:linear-gradient(180deg,#29b4ff,#0878e5);border-radius:3px 3px 0 0;box-shadow:0 0 13px rgba(0,145,255,.35)}
+#daily-ref-host .r-bcol em{font-style:normal;font-size:8px;color:#a3afb7;align-self:start;margin-top:5px}
+@media(max-width:760px){
+ #daily-ref-host{margin-top:14px}
+ #daily-ref-host .r-grid{display:flex;flex-direction:column;gap:12px}
+ #daily-ref-host .r-bottom{margin-top:12px}
+ #daily-ref-host .r-card{width:100%;padding:12px;border-radius:13px}
+ #daily-ref-host h3{font-size:13px}
+ #daily-ref-host .r-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #daily-ref-host .r-metric{min-height:76px;padding:9px;gap:8px}
+ #daily-ref-host .r-micon{width:38px;height:38px;font-size:18px}
+ #daily-ref-host .r-metric small{font-size:9px}
+ #daily-ref-host .r-metric strong{font-size:22px}
+ #daily-ref-host .conversion{grid-column:1/-1}
+ #daily-ref-host .r-table,#daily-ref-host .r-ranking,#daily-ref-host .r-chart{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ #daily-ref-host .r-rank{min-width:500px}
+ #daily-ref-host .r-bars{min-width:520px}
+}
+
 </style>
 </head>
 <body>
@@ -1556,37 +1622,7 @@ input,select,textarea{color-scheme:dark}
     <div class="section-title">Lojas — situação em tempo real</div>
     <div class="lojas-grid" id="lojas-grid"><div style="color:#555;font-size:13px;padding:20px">Conectando ao Firebase...</div></div>
 
-    <div class="daily-grid top-daily">
-      <section class="daily-panel daily-atend" style="display:block;background:#101820;border:1px solid #263540;border-radius:14px;padding:16px;min-width:0;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.22)">
-        <div class="daily-title" style="display:flex;align-items:center;margin:0 0 13px;color:#F5F7F9;font-size:13px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.15px">📋 Atendimentos do dia</div>
-        <div class="daily-table-wrap" style="display:block;width:100%;overflow-x:auto;border:1px solid #22313C;border-radius:10px;background:#0A1116">
-          <table class="daily-table">
-            <thead><tr><th>Loja</th><th>Total</th><th>Vendas</th><th>Vendões</th><th>WhatsApp</th><th>Trocas</th><th>Sem venda</th><th>Conversão</th></tr></thead>
-            <tbody id="hoje-lojas-body"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="daily-panel daily-resumo-panel" style="display:block;background:#101820;border:1px solid #263540;border-radius:14px;padding:16px;min-width:0;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.22)">
-        <div class="daily-title" style="display:flex;align-items:center;margin:0 0 13px;color:#F5F7F9;font-size:13px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.15px">📊 Resumo do dia</div>
-        <div id="resumo-dia" class="resumo-dia" style="display:block;width:100%;border:1px solid #22313C;border-radius:10px;overflow:hidden;background:#0A1116"></div>
-      </section>
-    </div>
-
-    <div class="daily-grid bottom-daily">
-      <section class="daily-panel" style="display:block;background:#101820;border:1px solid #263540;border-radius:14px;padding:16px;min-width:0;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.22)">
-        <div class="daily-title" style="display:flex;align-items:center;margin:0 0 13px;color:#F5F7F9;font-size:13px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.15px">🏆 Ranking de vendedoras (hoje)</div>
-        <div class="daily-table-wrap" style="display:block;width:100%;overflow-x:auto;border:1px solid #22313C;border-radius:10px;background:#0A1116">
-          <table class="daily-table ranking-hoje">
-            <thead><tr><th>#</th><th>Vendedora</th><th>Loja</th><th>Atend.</th><th>Vendas</th></tr></thead>
-            <tbody id="ranking-hoje-body"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="daily-panel" style="display:block;background:#101820;border:1px solid #263540;border-radius:14px;padding:16px;min-width:0;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.22)">
-        <div class="daily-title" style="display:flex;align-items:center;margin:0 0 13px;color:#F5F7F9;font-size:13px;line-height:1.2;font-weight:800;text-transform:uppercase;letter-spacing:.15px">📈 Evolução do dia</div>
-        <div id="evolucao-dia" class="evolucao-dia" style="display:flex;align-items:center;justify-content:center;height:230px;padding:20px 16px;border:1px solid #22313C;border-radius:10px;background:#0A1116;overflow-x:auto"></div>
-      </section>
-    </div>
+    <div id="daily-ref-host"></div>
   </div>
 
   <!-- VIEW RANKING -->
