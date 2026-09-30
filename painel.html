@@ -206,11 +206,12 @@ function popularSeletorMes() {
 }
 
 window.trocarTabPrincipal = function(t) {
-  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||(i===3&&t==='edicao')));
-  document.getElementById('view-hoje').style.display    = t==='hoje'    ? 'block':'none';
-  document.getElementById('view-ranking').style.display = t==='ranking' ? 'block':'none';
-  document.getElementById('view-analise').style.display = t==='analise' ? 'block':'none';
-  document.getElementById('view-edicao').style.display  = t==='edicao'  ? 'block':'none';
+  document.querySelectorAll('.tab-principal').forEach((el,i)=>el.classList.toggle('ativo',(i===0&&t==='hoje')||(i===1&&t==='ranking')||(i===2&&t==='analise')||(i===3&&t==='fechamento')||(i===4&&t==='edicao')));
+  document.getElementById('view-hoje').style.display       = t==='hoje'       ? 'block':'none';
+  document.getElementById('view-ranking').style.display    = t==='ranking'    ? 'block':'none';
+  document.getElementById('view-analise').style.display    = t==='analise'    ? 'block':'none';
+  document.getElementById('view-fechamento').style.display = t==='fechamento' ? 'block':'none';
+  document.getElementById('view-edicao').style.display     = t==='edicao'     ? 'block':'none';
 }
 
 async function buscarAtendimentosPeriodo(selValor, lojasParaBuscar) {
@@ -373,8 +374,444 @@ function renderAnaliseMensal(atendimentos, selMes) {
 
 window.trocarTab = trocarTabPrincipal;
 
+// ══════════════════ FECHAMENTO MENSAL ══════════════════
+const MESES_FECH = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function popularSeletorMesFech() {
+  const sel = document.getElementById('fech-mes');
+  const agora = new Date();
+  let opts = '';
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    opts += `<option value="${val}">${MESES_FECH[d.getMonth()]} de ${d.getFullYear()}</option>`;
+  }
+  sel.innerHTML = opts;
+}
+
+// Inicializar seletor quando aba abrir
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('tab-principal') && e.target.textContent.includes('Fechamento')) {
+    if (!document.getElementById('fech-mes').innerHTML) popularSeletorMesFech();
+  }
+});
+
+let _fechDados = []; // cache para WhatsApp
+
+window.carregarFechamento = async function() {
+  const selMes = document.getElementById('fech-mes').value;
+  const selLoja = document.getElementById('fech-loja').value;
+  if (!selMes) return;
+
+  document.getElementById('fech-loading').style.display = 'block';
+  document.getElementById('fech-conteudo').style.display = 'none';
+  document.getElementById('fech-hint').style.display = 'none';
+
+  const [ano, mes] = selMes.split('-').map(Number);
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  const lojasParaBuscar = selLoja === 'todas' ? LOJAS : LOJAS.filter(l => l.id === selLoja);
+
+  _fechDados = [];
+
+  for (const loja of lojasParaBuscar) {
+    let atend = [];
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${String(dia).padStart(2,'0')}-${String(mes).padStart(2,'0')}-${ano}`;
+      try {
+        const snap = await get(ref(db, `lojas/${loja.id}/atendimentos/${dataStr}`));
+        if (snap.exists()) atend = atend.concat(Object.values(snap.val()));
+      } catch(e) {}
+    }
+    _fechDados.push({loja, atend});
+  }
+
+  renderFechamento();
+  document.getElementById('fech-loading').style.display = 'none';
+  document.getElementById('fech-conteudo').style.display = 'block';
+}
+
+function calcFechLoja(atend) {
+  const total   = atend.length;
+  const vendas  = atend.filter(a=>a.resultado==='venda').length;
+  const vendoes = atend.filter(a=>a.resultado==='vendao').length;
+  const wpp     = atend.filter(a=>a.resultado==='whatsapp').length;
+  const trocas  = atend.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
+  const saiu    = atend.filter(a=>a.resultado==='saiu').length;
+  const conv    = total>0 ? Math.round(((vendas+vendoes+wpp)/total)*100) : 0;
+
+  // Ranking vendedoras
+  const porVend = {};
+  atend.forEach(a => {
+    if (!porVend[a.vendedora]) porVend[a.vendedora] = {venda:0,vendao:0,wpp:0,troca:0,saiu:0,total:0};
+    const v = porVend[a.vendedora]; v.total++;
+    if (a.resultado==='venda') v.venda++;
+    else if (a.resultado==='vendao') v.vendao++;
+    else if (a.resultado==='whatsapp') v.wpp++;
+    else if (a.resultado==='troca_s'||a.resultado==='troca_c') v.troca++;
+    else if (a.resultado==='saiu') v.saiu++;
+  });
+  const rankVend = Object.entries(porVend).sort((a,b)=>(b[1].venda+b[1].vendao+b[1].wpp)-(a[1].venda+a[1].vendao+a[1].wpp));
+
+  // Melhores horários (vendas por hora)
+  const horaVendas = {};
+  atend.filter(a=>a.resultado==='venda'||a.resultado==='vendao'||a.resultado==='whatsapp').forEach(a => {
+    if (a.hora) {
+      const h = a.hora.split(':')[0];
+      horaVendas[h] = (horaVendas[h]||0)+1;
+    }
+  });
+  const horasOrd = Object.entries(horaVendas).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // Motivos
+  const motivos = {};
+  atend.filter(a=>a.resultado==='saiu').forEach(a => {
+    if (a.motivo) motivos[a.motivo] = (motivos[a.motivo]||0)+1;
+  });
+  const motivosOrd = Object.entries(motivos).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  return {total, vendas, vendoes, wpp, trocas, saiu, conv, rankVend, horasOrd, motivosOrd};
+}
+
+function renderFechamento() {
+  const selMes = document.getElementById('fech-mes');
+  const mesLabel = selMes.options[selMes.selectedIndex].text;
+  const medalhas = ['🥇','🥈','🥉'];
+
+  const html = _fechDados.map(({loja, atend}) => {
+    if (!atend.length) return `
+      <div class="fech-loja-card">
+        <div class="fech-loja-titulo">🏪 ${loja.nome}</div>
+        <div style="color:#555;font-size:13px">Nenhum atendimento registrado neste período.</div>
+      </div>`;
+
+    const d = calcFechLoja(atend);
+
+    return `
+    <div class="fech-loja-card">
+      <div class="fech-loja-titulo">🏪 ${loja.nome} <span style="font-size:12px;color:#888;font-weight:400">${mesLabel}</span></div>
+
+      <div class="fech-numeros">
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--am)">${d.total}</div><div class="fech-lbl">Total</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--vd)">${d.vendas}</div><div class="fech-lbl">Vendas</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:#FFD700">${d.vendoes}</div><div class="fech-lbl">Vendões</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:#25D366">${d.wpp}</div><div class="fech-lbl">WhatsApp</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--az)">${d.trocas}</div><div class="fech-lbl">Trocas</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--vm)">${d.saiu}</div><div class="fech-lbl">Sem venda</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--am)">${d.conv}%</div><div class="fech-lbl">Conversão</div></div>
+      </div>
+
+      <div class="bar-out"><div class="bar-in" style="width:${d.conv}%"></div></div>
+
+      ${d.rankVend.length ? `
+      <div class="fech-secao">
+        <div class="fech-secao-titulo">🏆 Ranking de Vendedoras</div>
+        ${d.rankVend.map(([nome,v],i) => `
+          <div class="fech-rank-row">
+            <span class="fech-rank-pos">${medalhas[i]||i+1+'º'}</span>
+            <span class="fech-rank-nome">${nome}</span>
+            <span class="fech-rank-stats">✅${v.venda} 🏆${v.vendao} 📱${v.wpp} 🔄${v.troca} ❌${v.saiu} · ${v.total} atend.</span>
+          </div>`).join('')}
+      </div>` : ''}
+
+      ${d.horasOrd.length ? `
+      <div class="fech-secao">
+        <div class="fech-secao-titulo">🕐 Melhores Horários de Venda</div>
+        <div class="fech-horario-grid">
+          ${d.horasOrd.map(([h,n]) => `
+            <div class="fech-hora-item">
+              <div class="fech-hora-num">${n}</div>
+              <div class="fech-hora-lbl">${h}h</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      ${d.motivosOrd.length ? `
+      <div class="fech-secao">
+        <div class="fech-secao-titulo">❌ Principais Motivos de Não-Venda</div>
+        ${d.motivosOrd.map(([m,n]) => `
+          <div class="fech-motivo-linha">
+            <span>${m}</span>
+            <span class="fech-motivo-n">${n}x</span>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('fech-conteudo').innerHTML = html;
+}
+
+window.enviarFechamentoWpp = function(idx) {
+  const WPP = ['5513988301987','5511968122327'];
+  const selMes = document.getElementById('fech-mes');
+  const mesLabel = selMes.options[selMes.selectedIndex].text;
+
+  if (!_fechDados.length) { alert('Busque os dados primeiro!'); return; }
+
+  let texto = `📅 *FECHAMENTO MENSAL — ${mesLabel}*
+
+`;
+
+  _fechDados.forEach(({loja, atend}) => {
+    if (!atend.length) return;
+    const d = calcFechLoja(atend);
+    texto += `🏪 *${loja.nome}*
+`;
+    texto += `Atend: ${d.total} | Vendas: ${d.vendas} | Vendões: ${d.vendoes} | WPP: ${d.wpp}
+`;
+    texto += `Trocas: ${d.trocas} | Sem venda: ${d.saiu} | Conversão: *${d.conv}%*
+`;
+
+    if (d.rankVend.length) {
+      texto += `
+🏆 Ranking:
+`;
+      const medalhas = ['🥇','🥈','🥉'];
+      d.rankVend.forEach(([nome,v],i) => {
+        texto += `${medalhas[i]||i+1+'º'} ${nome}: ${v.venda+v.vendao+v.wpp} vendas · ${v.total} atend.
+`;
+      });
+    }
+
+    if (d.horasOrd.length) {
+      texto += `
+🕐 Melhores horários: ${d.horasOrd.map(([h,n])=>`${h}h(${n})`).join(', ')}
+`;
+    }
+
+    if (d.motivosOrd.length) {
+      texto += `
+❌ Motivos: ${d.motivosOrd.map(([m,n])=>`${m}(${n}x)`).join(', ')}
+`;
+    }
+    texto += '
+---
+';
+  });
+
+  texto += `_Fechamento via LIVE! Atendimento_`;
+  window.open('https://wa.me/'+WPP[idx]+'?text='+encodeURIComponent(texto),'_blank');
+}
+
 
 window.trocarTab = trocarTabPrincipal;
+
+// ══════════════════ FECHAMENTO MENSAL ══════════════════
+const MESES_FECH = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+function popularSeletorMesFech() {
+  const sel = document.getElementById('fech-mes');
+  const agora = new Date();
+  let opts = '';
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    opts += `<option value="${val}">${MESES_FECH[d.getMonth()]} de ${d.getFullYear()}</option>`;
+  }
+  sel.innerHTML = opts;
+}
+
+// Inicializar seletor quando aba abrir
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('tab-principal') && e.target.textContent.includes('Fechamento')) {
+    if (!document.getElementById('fech-mes').innerHTML) popularSeletorMesFech();
+  }
+});
+
+let _fechDados = []; // cache para WhatsApp
+
+window.carregarFechamento = async function() {
+  const selMes = document.getElementById('fech-mes').value;
+  const selLoja = document.getElementById('fech-loja').value;
+  if (!selMes) return;
+
+  document.getElementById('fech-loading').style.display = 'block';
+  document.getElementById('fech-conteudo').style.display = 'none';
+  document.getElementById('fech-hint').style.display = 'none';
+
+  const [ano, mes] = selMes.split('-').map(Number);
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  const lojasParaBuscar = selLoja === 'todas' ? LOJAS : LOJAS.filter(l => l.id === selLoja);
+
+  _fechDados = [];
+
+  for (const loja of lojasParaBuscar) {
+    let atend = [];
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${String(dia).padStart(2,'0')}-${String(mes).padStart(2,'0')}-${ano}`;
+      try {
+        const snap = await get(ref(db, `lojas/${loja.id}/atendimentos/${dataStr}`));
+        if (snap.exists()) atend = atend.concat(Object.values(snap.val()));
+      } catch(e) {}
+    }
+    _fechDados.push({loja, atend});
+  }
+
+  renderFechamento();
+  document.getElementById('fech-loading').style.display = 'none';
+  document.getElementById('fech-conteudo').style.display = 'block';
+}
+
+function calcFechLoja(atend) {
+  const total   = atend.length;
+  const vendas  = atend.filter(a=>a.resultado==='venda').length;
+  const vendoes = atend.filter(a=>a.resultado==='vendao').length;
+  const wpp     = atend.filter(a=>a.resultado==='whatsapp').length;
+  const trocas  = atend.filter(a=>a.resultado==='troca_s'||a.resultado==='troca_c').length;
+  const saiu    = atend.filter(a=>a.resultado==='saiu').length;
+  const conv    = total>0 ? Math.round(((vendas+vendoes+wpp)/total)*100) : 0;
+
+  // Ranking vendedoras
+  const porVend = {};
+  atend.forEach(a => {
+    if (!porVend[a.vendedora]) porVend[a.vendedora] = {venda:0,vendao:0,wpp:0,troca:0,saiu:0,total:0};
+    const v = porVend[a.vendedora]; v.total++;
+    if (a.resultado==='venda') v.venda++;
+    else if (a.resultado==='vendao') v.vendao++;
+    else if (a.resultado==='whatsapp') v.wpp++;
+    else if (a.resultado==='troca_s'||a.resultado==='troca_c') v.troca++;
+    else if (a.resultado==='saiu') v.saiu++;
+  });
+  const rankVend = Object.entries(porVend).sort((a,b)=>(b[1].venda+b[1].vendao+b[1].wpp)-(a[1].venda+a[1].vendao+a[1].wpp));
+
+  // Melhores horários (vendas por hora)
+  const horaVendas = {};
+  atend.filter(a=>a.resultado==='venda'||a.resultado==='vendao'||a.resultado==='whatsapp').forEach(a => {
+    if (a.hora) {
+      const h = a.hora.split(':')[0];
+      horaVendas[h] = (horaVendas[h]||0)+1;
+    }
+  });
+  const horasOrd = Object.entries(horaVendas).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // Motivos
+  const motivos = {};
+  atend.filter(a=>a.resultado==='saiu').forEach(a => {
+    if (a.motivo) motivos[a.motivo] = (motivos[a.motivo]||0)+1;
+  });
+  const motivosOrd = Object.entries(motivos).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  return {total, vendas, vendoes, wpp, trocas, saiu, conv, rankVend, horasOrd, motivosOrd};
+}
+
+function renderFechamento() {
+  const selMes = document.getElementById('fech-mes');
+  const mesLabel = selMes.options[selMes.selectedIndex].text;
+  const medalhas = ['🥇','🥈','🥉'];
+
+  const html = _fechDados.map(({loja, atend}) => {
+    if (!atend.length) return `
+      <div class="fech-loja-card">
+        <div class="fech-loja-titulo">🏪 ${loja.nome}</div>
+        <div style="color:#555;font-size:13px">Nenhum atendimento registrado neste período.</div>
+      </div>`;
+
+    const d = calcFechLoja(atend);
+
+    return `
+    <div class="fech-loja-card">
+      <div class="fech-loja-titulo">🏪 ${loja.nome} <span style="font-size:12px;color:#888;font-weight:400">${mesLabel}</span></div>
+
+      <div class="fech-numeros">
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--am)">${d.total}</div><div class="fech-lbl">Total</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--vd)">${d.vendas}</div><div class="fech-lbl">Vendas</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:#FFD700">${d.vendoes}</div><div class="fech-lbl">Vendões</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:#25D366">${d.wpp}</div><div class="fech-lbl">WhatsApp</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--az)">${d.trocas}</div><div class="fech-lbl">Trocas</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--vm)">${d.saiu}</div><div class="fech-lbl">Sem venda</div></div>
+        <div class="fech-num-card"><div class="fech-num" style="color:var(--am)">${d.conv}%</div><div class="fech-lbl">Conversão</div></div>
+      </div>
+
+      <div class="bar-out"><div class="bar-in" style="width:${d.conv}%"></div></div>
+
+      ${d.rankVend.length ? `
+      <div class="fech-secao">
+        <div class="fech-secao-titulo">🏆 Ranking de Vendedoras</div>
+        ${d.rankVend.map(([nome,v],i) => `
+          <div class="fech-rank-row">
+            <span class="fech-rank-pos">${medalhas[i]||i+1+'º'}</span>
+            <span class="fech-rank-nome">${nome}</span>
+            <span class="fech-rank-stats">✅${v.venda} 🏆${v.vendao} 📱${v.wpp} 🔄${v.troca} ❌${v.saiu} · ${v.total} atend.</span>
+          </div>`).join('')}
+      </div>` : ''}
+
+      ${d.horasOrd.length ? `
+      <div class="fech-secao">
+        <div class="fech-secao-titulo">🕐 Melhores Horários de Venda</div>
+        <div class="fech-horario-grid">
+          ${d.horasOrd.map(([h,n]) => `
+            <div class="fech-hora-item">
+              <div class="fech-hora-num">${n}</div>
+              <div class="fech-hora-lbl">${h}h</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      ${d.motivosOrd.length ? `
+      <div class="fech-secao">
+        <div class="fech-secao-titulo">❌ Principais Motivos de Não-Venda</div>
+        ${d.motivosOrd.map(([m,n]) => `
+          <div class="fech-motivo-linha">
+            <span>${m}</span>
+            <span class="fech-motivo-n">${n}x</span>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('fech-conteudo').innerHTML = html;
+}
+
+window.enviarFechamentoWpp = function(idx) {
+  const WPP = ['5513988301987','5511968122327'];
+  const selMes = document.getElementById('fech-mes');
+  const mesLabel = selMes.options[selMes.selectedIndex].text;
+
+  if (!_fechDados.length) { alert('Busque os dados primeiro!'); return; }
+
+  let texto = `📅 *FECHAMENTO MENSAL — ${mesLabel}*
+
+`;
+
+  _fechDados.forEach(({loja, atend}) => {
+    if (!atend.length) return;
+    const d = calcFechLoja(atend);
+    texto += `🏪 *${loja.nome}*
+`;
+    texto += `Atend: ${d.total} | Vendas: ${d.vendas} | Vendões: ${d.vendoes} | WPP: ${d.wpp}
+`;
+    texto += `Trocas: ${d.trocas} | Sem venda: ${d.saiu} | Conversão: *${d.conv}%*
+`;
+
+    if (d.rankVend.length) {
+      texto += `
+🏆 Ranking:
+`;
+      const medalhas = ['🥇','🥈','🥉'];
+      d.rankVend.forEach(([nome,v],i) => {
+        texto += `${medalhas[i]||i+1+'º'} ${nome}: ${v.venda+v.vendao+v.wpp} vendas · ${v.total} atend.
+`;
+      });
+    }
+
+    if (d.horasOrd.length) {
+      texto += `
+🕐 Melhores horários: ${d.horasOrd.map(([h,n])=>`${h}h(${n})`).join(', ')}
+`;
+    }
+
+    if (d.motivosOrd.length) {
+      texto += `
+❌ Motivos: ${d.motivosOrd.map(([m,n])=>`${m}(${n}x)`).join(', ')}
+`;
+    }
+    texto += '
+---
+';
+  });
+
+  texto += `_Fechamento via LIVE! Atendimento_`;
+  window.open('https://wa.me/'+WPP[idx]+'?text='+encodeURIComponent(texto),'_blank');
+}
 
 // ══════════════════ EDIÇÃO ══════════════════
 let edLojaId = null, edData = null, edAtendimentos = [], edIdEditando = null;
@@ -1136,6 +1573,25 @@ main{padding:24px;max-width:1100px;margin:0 auto}
 #analise-loading{text-align:center;padding:60px 0;color:#666;font-size:13px}
 .atalho-data{color:var(--am);cursor:pointer;font-weight:700;text-decoration:underline}
 .atalho-data:hover{opacity:.8}
+.fech-loja-card{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:20px;margin-bottom:20px}
+.fech-loja-titulo{font-size:18px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.fech-numeros{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.fech-num-card{background:var(--cm);border-radius:8px;padding:12px;text-align:center}
+.fech-num{font-size:22px;font-weight:900;line-height:1}
+.fech-lbl{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.fech-secao{margin-top:16px;padding-top:14px;border-top:1px solid #222}
+.fech-secao-titulo{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.fech-rank-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--cm);border-radius:8px;margin-bottom:6px}
+.fech-rank-pos{font-size:16px;width:28px;text-align:center;flex-shrink:0}
+.fech-rank-nome{font-size:13px;font-weight:700;flex:1}
+.fech-rank-stats{font-size:11px;color:#aaa;text-align:right}
+.fech-horario-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.fech-hora-item{background:var(--cm);border-radius:6px;padding:8px 4px;text-align:center}
+.fech-hora-num{font-size:15px;font-weight:800;color:var(--am)}
+.fech-hora-lbl{font-size:9px;color:#888;margin-top:2px}
+.fech-motivo-linha{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #222;color:#ccc}
+.fech-motivo-linha:last-child{border-bottom:none}
+.fech-motivo-n{font-weight:700;color:var(--la)}
 .ranking-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
 @media(min-width:900px){.ranking-grid{grid-template-columns:repeat(3,1fr)}}
 .ranking-bloco{background:var(--ce);border:1px solid var(--cb);border-radius:12px;padding:18px}
@@ -1361,6 +1817,7 @@ main{padding:24px;max-width:1100px;margin:0 auto}
   <div class="tab-principal ativo" onclick="trocarTabPrincipal('hoje')">📊 Hoje — Ao Vivo</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('ranking')">🏆 Ranking</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('analise')">📈 Análise Mensal</div>
+  <div class="tab-principal" onclick="trocarTabPrincipal('fechamento')">📅 Fechamento Mensal</div>
   <div class="tab-principal" onclick="trocarTabPrincipal('edicao')">✏️ Editar Registros</div>
 </div>
 
@@ -1540,6 +1997,28 @@ main{padding:24px;max-width:1100px;margin:0 auto}
     <div style="color:#555;font-size:12px;text-align:center;margin-top:16px" id="analise-hint">
       Selecione o mês e a loja, depois clique em "Buscar" para ver a análise.
     </div>
+  </div>
+
+  <!-- VIEW FECHAMENTO MENSAL -->
+  <div id="view-fechamento" style="display:none">
+    <div style="margin-bottom:24px"></div>
+    <div class="am-filtros">
+      <select class="am-select" id="fech-mes"></select>
+      <select class="am-select" id="fech-loja">
+        <option value="todas">Todas as lojas</option>
+        <option value="praiamar">Praiamar</option>
+        <option value="miramar">Miramar</option>
+        <option value="azevedo">Azevedo</option>
+        <option value="praiagrande">Praia Grande</option>
+        <option value="bioritmo">Bioritmo</option>
+      </select>
+      <button class="btn-am-buscar" onclick="carregarFechamento()">🔍 Buscar</button>
+      <button class="btn-am-buscar" style="background:#25D366" onclick="enviarFechamentoWpp(0)">📲 Roberta</button>
+      <button class="btn-am-buscar" style="background:#128C7E" onclick="enviarFechamentoWpp(1)">📲 Nixon</button>
+    </div>
+    <div id="fech-loading" style="display:none;text-align:center;padding:40px;color:#666;font-size:13px">⏳ Carregando dados do mês...</div>
+    <div id="fech-conteudo" style="display:none"></div>
+    <div id="fech-hint" style="color:#555;font-size:12px;text-align:center;margin-top:16px">Selecione o mês e a loja para ver o fechamento.</div>
   </div>
 
   <!-- VIEW EDIÇÃO -->
