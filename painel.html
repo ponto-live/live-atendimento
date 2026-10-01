@@ -477,7 +477,7 @@ function renderFechamento() {
   const mesLabel = selMes.options[selMes.selectedIndex].text;
   const medalhas = ['1º','2º','3º'];
 
-  const html = _fechDados.map(({loja, atend}) => {
+  const htmlLojas = _fechDados.map(({loja, atend}) => {
     if (!atend.length) return `
       <div class="fech-loja-card">
         <div class="fech-loja-titulo">🏪 ${loja.nome}</div>
@@ -537,7 +537,24 @@ function renderFechamento() {
     </div>`;
   }).join('');
 
-  document.getElementById('fech-conteudo').innerHTML = html;
+  let consolidado = '';
+  if (_fechDados.length > 1) {
+    const geral = calcFechLoja(_fechDados.flatMap(item => item.atend));
+    const numeros = [
+      ['Atendimentos', geral.total, 'var(--am)'],
+      ['Vendas', geral.vendas, 'var(--vd)'],
+      ['Vendões', geral.vendoes, '#FFD700'],
+      ['WhatsApp', geral.wpp, '#25D366'],
+      ['Trocas', geral.trocas, 'var(--az)'],
+      ['Sem venda', geral.saiu, 'var(--vm)'],
+      ['Conversão', geral.conv + '%', 'var(--am)']
+    ];
+    consolidado = `<div class="fech-loja-card">
+      <div class="fech-loja-titulo">CONSOLIDADO GERAL — TODAS AS LOJAS <span style="font-size:12px;color:#888;font-weight:400">${mesLabel}</span></div>
+      <div class="fech-numeros">${numeros.map(([label, valor, cor]) => `<div class="fech-num-card"><div class="fech-num" style="color:${cor}">${valor}</div><div class="fech-lbl">${label}</div></div>`).join('')}</div>
+    </div>`;
+  }
+  document.getElementById('fech-conteudo').innerHTML = consolidado + htmlLojas;
 }
 
 window.enviarFechamentoWpp = function(wppIdx) {
@@ -548,6 +565,13 @@ window.enviarFechamentoWpp = function(wppIdx) {
   if (!_fechDados.length) { alert('Busque os dados primeiro!'); return; }
 
   let texto = '*FECHAMENTO MENSAL — ' + mesLabel + '*\n\n';
+
+  if (_fechDados.length > 1) {
+    const geral = calcFechLoja(_fechDados.flatMap(item => item.atend));
+    texto += '*CONSOLIDADO GERAL — TODAS AS LOJAS*\n';
+    texto += 'Atendimentos: ' + geral.total + ' | Vendas: ' + geral.vendas + ' | Vendões: ' + geral.vendoes + ' | WPP: ' + geral.wpp + '\n';
+    texto += 'Trocas: ' + geral.trocas + ' | Sem venda: ' + geral.saiu + ' | Conversão: *' + geral.conv + '%*\n\n---\n\n';
+  }
 
   _fechDados.forEach(function(item) {
     const loja = item.loja; const atend = item.atend;
