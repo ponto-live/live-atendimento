@@ -475,7 +475,7 @@ function calcFechLoja(atend) {
 function renderFechamento() {
   const selMes = document.getElementById('fech-mes');
   const mesLabel = selMes.options[selMes.selectedIndex].text;
-  const medalhas = ['🥇','🥈','🥉'];
+  const medalhas = ['1º','2º','3º'];
 
   const html = _fechDados.map(({loja, atend}) => {
     if (!atend.length) return `
@@ -547,31 +547,33 @@ window.enviarFechamentoWpp = function(wppIdx) {
 
   if (!_fechDados.length) { alert('Busque os dados primeiro!'); return; }
 
-  let texto = '📅 *FECHAMENTO MENSAL — ' + mesLabel + '*\n\n';
+  let texto = '*FECHAMENTO MENSAL — ' + mesLabel + '*\n\n';
 
   _fechDados.forEach(function(item) {
     const loja = item.loja; const atend = item.atend;
     if (!atend.length) return;
     const d = calcFechLoja(atend);
-    texto += '🏪 *' + loja.nome + '*\n';
+    texto += '*' + loja.nome + '*\n';
     texto += 'Atend: ' + d.total + ' | Vendas: ' + d.vendas + ' | Vendões: ' + d.vendoes + ' | WPP: ' + d.wpp + '\n';
     texto += 'Trocas: ' + d.trocas + ' | Sem venda: ' + d.saiu + ' | Conversão: *' + d.conv + '%*\n';
 
     if (d.rankVend.length) {
-      texto += '\n🏆 Ranking:\n';
-      const medalhas = ['🥇','🥈','🥉'];
+      texto += '\nRanking:\n';
+      const medalhas = ['1º','2º','3º'];
       d.rankVend.forEach(function(item2, i) {
         const nome = item2[0]; const v = item2[1];
-        texto += (medalhas[i]||i+1+'º') + ' ' + nome + ': ' + (v.venda+v.vendao+v.wpp) + ' vendas · ' + v.total + ' atend.\n';
+        texto += (i+1) + 'º ' + nome + ': ' + v.total + ' atend.\n';
+        texto += 'Vendas: ' + v.venda + ' | Vendões: ' + v.vendao + ' | WPP: ' + v.wpp + '\n';
+        texto += 'Trocas: ' + v.troca + ' | Sem venda: ' + v.saiu + '\n\n';
       });
     }
 
     if (d.horasOrd.length) {
-      texto += '\n🕐 Melhores horários: ' + d.horasOrd.map(function(h){return h[0]+'h('+h[1]+')';}).join(', ') + '\n';
+      texto += '\nMelhores horários: ' + d.horasOrd.map(function(h){return h[0]+'h('+h[1]+')';}).join(', ') + '\n';
     }
 
     if (d.motivosOrd.length) {
-      texto += '\n❌ Motivos: ' + d.motivosOrd.map(function(m){return m[0]+'('+m[1]+'x)';}).join(', ') + '\n';
+      texto += '\nMotivos: ' + d.motivosOrd.map(function(m){return m[0]+'('+m[1]+'x)';}).join(', ') + '\n';
     }
     texto += '\n---\n';
   });
