@@ -477,7 +477,7 @@ function renderFechamento() {
   const mesLabel = selMes.options[selMes.selectedIndex].text;
   const medalhas = ['1º','2º','3º'];
 
-  const htmlLojas = _fechDados.map(({loja, atend}) => {
+  const html = _fechDados.map(({loja, atend}) => {
     if (!atend.length) return `
       <div class="fech-loja-card">
         <div class="fech-loja-titulo">🏪 ${loja.nome}</div>
@@ -537,24 +537,7 @@ function renderFechamento() {
     </div>`;
   }).join('');
 
-  let consolidado = '';
-  if (_fechDados.length > 1) {
-    const geral = calcFechLoja(_fechDados.flatMap(item => item.atend));
-    const numeros = [
-      ['Atendimentos', geral.total, 'var(--am)'],
-      ['Vendas', geral.vendas, 'var(--vd)'],
-      ['Vendões', geral.vendoes, '#FFD700'],
-      ['WhatsApp', geral.wpp, '#25D366'],
-      ['Trocas', geral.trocas, 'var(--az)'],
-      ['Sem venda', geral.saiu, 'var(--vm)'],
-      ['Conversão', geral.conv + '%', 'var(--am)']
-    ];
-    consolidado = `<div class="fech-loja-card">
-      <div class="fech-loja-titulo">CONSOLIDADO GERAL — TODAS AS LOJAS <span style="font-size:12px;color:#888;font-weight:400">${mesLabel}</span></div>
-      <div class="fech-numeros">${numeros.map(([label, valor, cor]) => `<div class="fech-num-card"><div class="fech-num" style="color:${cor}">${valor}</div><div class="fech-lbl">${label}</div></div>`).join('')}</div>
-    </div>`;
-  }
-  document.getElementById('fech-conteudo').innerHTML = consolidado + htmlLojas;
+  document.getElementById('fech-conteudo').innerHTML = html;
 }
 
 window.enviarFechamentoWpp = function(wppIdx) {
@@ -565,13 +548,6 @@ window.enviarFechamentoWpp = function(wppIdx) {
   if (!_fechDados.length) { alert('Busque os dados primeiro!'); return; }
 
   let texto = '*FECHAMENTO MENSAL — ' + mesLabel + '*\n\n';
-
-  if (_fechDados.length > 1) {
-    const geral = calcFechLoja(_fechDados.flatMap(item => item.atend));
-    texto += '*CONSOLIDADO GERAL — TODAS AS LOJAS*\n';
-    texto += 'Atendimentos: ' + geral.total + ' | Vendas: ' + geral.vendas + ' | Vendões: ' + geral.vendoes + ' | WPP: ' + geral.wpp + '\n';
-    texto += 'Trocas: ' + geral.trocas + ' | Sem venda: ' + geral.saiu + ' | Conversão: *' + geral.conv + '%*\n\n---\n\n';
-  }
 
   _fechDados.forEach(function(item) {
     const loja = item.loja; const atend = item.atend;
@@ -807,6 +783,159 @@ async function edSalvarModal() {
   await edSalvarFirebase();
   edFecharModal();
   edRenderLista();
+}
+
+// ══ RANKING ══
+async function buscarAtendimentosPorDatas(dataIni, dataFim, lojasParaBuscar) {
+  let atendimentos = [];
+  const [anoIni, mesIni, diaIni] = dataIni.split('-').map(Number);
+  const [anoFim, mesFim, diaFim] = dataFim.split('-').map(Number);
+  const ini = new Date(anoIni, mesIni-1, diaIni);
+  const fim = new Date(anoFim, mesFim-1, diaFim);
+  for (let d = new Date(ini); d <= fim; d.setDate(d.getDate()+1)) {
+    const dia = String(d.getDate()).padStart(2,'0');
+    const mes = String(d.getMonth()+1).padStart(2,'0');
+    const ano = d.getFullYear();
+    const dataStr = dia+'-'+mes+'-'+ano;
+    for (const lojaId of lojasParaBuscar) {
+      try {
+        const snap = await get(ref(db, 'lojas/'+lojaId+'/atendimentos/'+dataStr));
+        if (snap.exists()) {
+          const vals = Object.values(snap.val());
+          vals.forEach(v => v._loja = lojaId);
+          atendimentos = atendimentos.concat(vals);
+        }
+      } catch(e) {}
+    }
+  }
+  return atendimentos;
+}
+
+window.toggleDatasCustom = function() {
+  const v = document.getElementById('rank-periodo').value;
+  const bloco = document.getElementById('bloco-datas-custom');
+  if (bloco) bloco.style.display = v==='custom' ? 'block' : 'none';
+}
+
+window.setUltimos = function(dias) {
+  const fim = new Date();
+  const ini = new Date(); ini.setDate(ini.getDate() - (dias-1));
+  document.getElementById('rank-data-ini').value = ini.toISOString().split('T')[0];
+  document.getElementById('rank-data-fim').value = fim.toISOString().split('T')[0];
+}
+
+window.setSemanaAtual = function() {
+  const hoje = new Date();
+  const diaSemana = hoje.getDay();
+  const ini = new Date(hoje); ini.setDate(hoje.getDate() - (diaSemana === 0 ? 6 : diaSemana-1));
+  document.getElementById('rank-data-ini').value = ini.toISOString().split('T')[0];
+  document.getElementById('rank-data-fim').value = hoje.toISOString().split('T')[0];
+}
+
+window.carregarRanking = async function() {
+  const periodo = document.getElementById('rank-periodo').value;
+  const lojaId  = document.getElementById('rank-loja').value;
+  const lojasParaBuscar = lojaId === 'todas' ? LOJAS.map(l=>l.id) : [lojaId];
+  const agora = new Date();
+
+  document.getElementById('ranking-loading').style.display = 'block';
+  document.getElementById('ranking-conteudo').style.display = 'none';
+  const hint = document.getElementById('ranking-hint');
+  if (hint) hint.style.display = 'none';
+
+  let atendimentos = [];
+
+  if (periodo === 'hoje') {
+    lojasParaBuscar.forEach(lid => {
+      atendimentos = atendimentos.concat(dadosLojas[lid]?.atend || []);
+    });
+    renderRanking(atendimentos);
+  } else if (periodo === 'custom') {
+    const ini = document.getElementById('rank-data-ini').value;
+    const fim = document.getElementById('rank-data-fim').value;
+    if (!ini || !fim) { alert('Selecione a data inicial e final!'); document.getElementById('ranking-loading').style.display='none'; return; }
+    atendimentos = await buscarAtendimentosPorDatas(ini, fim, lojasParaBuscar);
+    renderRanking(atendimentos);
+  } else {
+    const anoMes = periodo === 'mes'
+      ? {ano: agora.getFullYear(), mes: agora.getMonth()+1}
+      : agora.getMonth() === 0
+        ? {ano: agora.getFullYear()-1, mes: 12}
+        : {ano: agora.getFullYear(), mes: agora.getMonth()};
+    const selVal = anoMes.ano+'-'+String(anoMes.mes).padStart(2,'0');
+    atendimentos = await buscarAtendimentosPeriodo(selVal, lojasParaBuscar);
+    renderRanking(atendimentos);
+  }
+}
+
+function renderRanking(atendimentos) {
+  document.getElementById('ranking-loading').style.display = 'none';
+  document.getElementById('ranking-conteudo').style.display = 'block';
+
+  const stats = {};
+  atendimentos.forEach(a => {
+    if (!stats[a.vendedora]) stats[a.vendedora] = {venda:0, vendao:0, troca:0, troca_c:0, saiu:0, wpp:0, total:0, totalVendao:0, maiorVendao:0, maiorTrocaC:0};
+    const s = stats[a.vendedora];
+    s.total++;
+    if (a.resultado==='venda') s.venda++;
+    else if (a.resultado==='vendao') {
+      s.vendao++;
+      if(a.valorVendao){ s.totalVendao+=a.valorVendao; if(a.valorVendao>s.maiorVendao) s.maiorVendao=a.valorVendao; }
+    }
+    else if (a.resultado==='troca_s') s.troca++;
+    else if (a.resultado==='troca_c') { s.troca++; s.troca_c++; if(a.diferenca && a.diferenca>s.maiorTrocaC) s.maiorTrocaC=a.diferenca; }
+    else if (a.resultado==='saiu') s.saiu++;
+    else if (a.resultado==='whatsapp') s.wpp++;
+  });
+
+  const vendedoras = Object.entries(stats);
+  const medalhas = ['🥇','🥈','🥉'];
+
+  function renderLista(lista, campo, cor) {
+    const ord = [...lista].sort((a,b)=>b[1][campo]-a[1][campo]).filter(([,v])=>v[campo]>0);
+    if (!ord.length) return '<div style="color:#555;font-size:12px;padding:16px">Nenhum registro</div>';
+    return ord.map(([nome,v],i) => `
+      <div class="rank-row">
+        <span class="rank-pos">${medalhas[i]||i+1+'º'}</span>
+        <span class="rank-nome">${nome}</span>
+        <span class="rank-num" style="color:${cor}">${v[campo]}</span>
+        <span class="rank-de">${v.total} atend.</span>
+      </div>`).join('');
+  }
+
+  const ids = ['rank-vendao','rank-venda','rank-troca','rank-troca-c','rank-wpp','rank-saiu'];
+  const campos = ['vendao','venda','troca','troca_c','wpp','saiu'];
+  const cores = ['#FFD700','#22C55E','#3B82F6','#A855F7','#25D366','#EF4444'];
+  ids.forEach((id,i) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = renderLista(vendedoras, campos[i], cores[i]);
+  });
+
+  // Maior vendão
+  const comVendao = vendedoras.filter(([,v])=>v.maiorVendao>0).sort((a,b)=>b[1].maiorVendao-a[1].maiorVendao);
+  const elMV = document.getElementById('rank-maior-vendao');
+  if (elMV) elMV.innerHTML = comVendao.length ? comVendao.map(([nome,v],i)=>`
+    <div class="rank-row">
+      <span class="rank-pos">${medalhas[i]||i+1+'º'}</span>
+      <span class="rank-nome">${nome}</span>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="rank-num" style="color:#FFD700;font-size:14px">R$${v.maiorVendao.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+        <div style="font-size:9px;color:#666">${v.vendao} vendão(ões)</div>
+      </div>
+    </div>`).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhum vendão com valor</div>';
+
+  // Maior troca com diferença
+  const comTrocaC = vendedoras.filter(([,v])=>v.maiorTrocaC>0).sort((a,b)=>b[1].maiorTrocaC-a[1].maiorTrocaC);
+  const elMTC = document.getElementById('rank-maior-troca-c');
+  if (elMTC) elMTC.innerHTML = comTrocaC.length ? comTrocaC.map(([nome,v],i)=>`
+    <div class="rank-row">
+      <span class="rank-pos">${medalhas[i]||i+1+'º'}</span>
+      <span class="rank-nome">${nome}</span>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="rank-num" style="color:#A855F7;font-size:14px">R$${v.maiorTrocaC.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+        <div style="font-size:9px;color:#666">${v.troca_c} troca(s) c/ dif.</div>
+      </div>
+    </div>`).join('') : '<div style="color:#555;font-size:12px;padding:16px">Nenhuma troca com diferença</div>';
 }
 
 </script>
