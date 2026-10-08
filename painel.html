@@ -890,7 +890,7 @@ function renderRanking(atend) {
 
   function buildList(sorted, valFn, extraFn) {
     if (!sorted.length) return '<div style="color:#555;font-size:12px;padding:8px">Sem dados</div>';
-    return sorted.slice(0,5).map(([nome, v], i) => {
+    return sorted.map(([nome, v], i) => {
       const val = valFn(v);
       const extra = extraFn ? extraFn(v) : '';
       return `<div class="rank-row">
