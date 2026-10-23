@@ -26,7 +26,7 @@ const db = getDatabase(app);
 const LOJA_ID   = 'paraiso';
 const LOJA_NOME = 'LIVE! Paraíso';
 const LOJA_TAG  = 'Paraíso';
-const Paraiso    = 'Paraíso';
+const Paraiso = 'Paraiso';
 const WPP = ['5511984720004','5511984720004'];
 const VENDEDORAS_INICIAIS = ["Michelly", "Tayna", "Ana Beatriz"];
 
@@ -395,7 +395,7 @@ window.gerarPDF = function(){
   let y=88;atendimentos.forEach((a,i)=>{if(y>272){doc.addPage();y=20;doc.setFillColor(10,10,10);doc.rect(0,0,210,297,'F');}if(i%2===0){doc.setFillColor(20,20,20);doc.rect(11,y-3,188,7,'F');}doc.setFont('helvetica','normal');doc.setTextColor(185,185,185);doc.setFontSize(7);doc.text(a.hora,14,y);doc.text(a.vendedora,34,y);doc.setTextColor(...cm[a.resultado]);doc.text(rm[a.resultado],75,y);doc.setTextColor(165,165,165);let det=a.motivo||'';if(a.diferenca!=null)det='R$'+Number(a.diferenca).toFixed(2);if(a.valorVendao!=null)det='R$'+Number(a.valorVendao).toFixed(2);if(a.valorWhatsapp!=null)det='R$'+Number(a.valorWhatsapp).toFixed(2);if(det.length>42)det=det.substring(0,39)+'...';doc.text(det,125,y);y+=7;});
   const mots={};atendimentos.filter(a=>a.resultado==='saiu').forEach(a=>{if(a.motivo)mots[a.motivo]=(mots[a.motivo]||0)+1;});const mo=Object.entries(mots).sort((a,b)=>b[1]-a[1]);if(mo.length){y+=6;doc.setTextColor(120,120,120);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('MOTIVOS DE NÃO-VENDA',11,y);y+=7;mo.forEach(([m,n])=>{doc.setFillColor(26,26,26);doc.rect(11,y-3,188,7,'F');doc.setFont('helvetica','normal');doc.setTextColor(185,185,185);doc.setFontSize(7);doc.text(m,15,y);doc.setTextColor(249,115,22);doc.setFont('helvetica','bold');doc.text(n+'x',196,y,{align:'right'});y+=7;});}
   doc.setFillColor(245,200,0);doc.rect(0,287,210,10,'F');doc.setTextColor(10,10,10);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('LIVE! '+LOJA_NOME+' · '+ds+' · '+hs,105,293,{align:'center'});
-  const pdfBlob=doc.output('blob');const blobUrl=URL.createObjectURL(pdfBlob);const link=document.createElement('a');link.href=blobUrl;link.download='LIVE_Atendimento_'+Praiamar+'_'+dataHoje()+'.pdf';link.target='_blank';document.body.appendChild(link);link.click();setTimeout(()=>{document.body.removeChild(link);URL.revokeObjectURL(blobUrl);},1000);
+  const pdfBlob=doc.output('blob');const blobUrl=URL.createObjectURL(pdfBlob);const link=document.createElement('a');link.href=blobUrl;link.download='LIVE_Atendimento_'+Paraiso+'_'+dataHoje()+'.pdf';link.target='_blank';document.body.appendChild(link);link.click();setTimeout(()=>{document.body.removeChild(link);URL.revokeObjectURL(blobUrl);},1000);
 }
 
 // ══ WHATSAPP ══
@@ -612,7 +612,7 @@ main{padding:20px;max-width:860px;margin:0 auto}
 <header>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="logo">LIVE<span>!</span></div>
-    <div class="loja-tag">Praiamar</div>
+    <div class="loja-tag">Paraíso</div>
   </div>
   <div class="header-right">
     <div class="live-badge"><span class="live-dot"></span>Ao vivo</div>
