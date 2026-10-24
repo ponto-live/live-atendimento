@@ -834,16 +834,17 @@ window.carregarRanking = async function() {
   let dataIni, dataFim;
   const hoje = new Date();
 
+  const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   if (periodo === 'hoje') {
-    dataIni = dataFim = hoje.toISOString().split('T')[0];
+    dataIni = dataFim = toISO(hoje);
   } else if (periodo === 'mes') {
     dataIni = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-01`;
-    dataFim = hoje.toISOString().split('T')[0];
+    dataFim = toISO(hoje);
   } else if (periodo === 'mes-anterior') {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
     const ultimo = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-    dataIni = d.toISOString().split('T')[0];
-    dataFim = ultimo.toISOString().split('T')[0];
+    dataIni = toISO(d);
+    dataFim = toISO(ultimo);
   } else if (periodo === 'custom') {
     dataIni = document.getElementById('rank-data-ini').value;
     dataFim = document.getElementById('rank-data-fim').value;
