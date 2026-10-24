@@ -788,18 +788,20 @@ window.toggleDatasCustom = function() {
 };
 
 window.setUltimos = function(dias) {
+  const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const fim = new Date();
   const ini = new Date(); ini.setDate(ini.getDate() - (dias - 1));
-  document.getElementById('rank-data-ini').value = ini.toISOString().split('T')[0];
-  document.getElementById('rank-data-fim').value = fim.toISOString().split('T')[0];
+  document.getElementById('rank-data-ini').value = toISO(ini);
+  document.getElementById('rank-data-fim').value = toISO(fim);
 };
 
 window.setSemanaAtual = function() {
+  const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const hoje = new Date();
   const dow = hoje.getDay();
   const ini = new Date(hoje); ini.setDate(hoje.getDate() - dow);
-  document.getElementById('rank-data-ini').value = ini.toISOString().split('T')[0];
-  document.getElementById('rank-data-fim').value = hoje.toISOString().split('T')[0];
+  document.getElementById('rank-data-ini').value = toISO(ini);
+  document.getElementById('rank-data-fim').value = toISO(hoje);
 };
 
 async function buscarAtendimentosPorDatas(dataIni, dataFim, lojas) {
@@ -833,16 +835,17 @@ window.carregarRanking = async function() {
   let dataIni, dataFim;
   const hoje = new Date();
 
+  const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   if (periodo === 'hoje') {
-    dataIni = dataFim = hoje.toISOString().split('T')[0];
+    dataIni = dataFim = toISO(hoje);
   } else if (periodo === 'mes') {
     dataIni = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-01`;
-    dataFim = hoje.toISOString().split('T')[0];
+    dataFim = toISO(hoje);
   } else if (periodo === 'mes-anterior') {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
     const ultimo = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-    dataIni = d.toISOString().split('T')[0];
-    dataFim = ultimo.toISOString().split('T')[0];
+    dataIni = toISO(d);
+    dataFim = toISO(ultimo);
   } else if (periodo === 'custom') {
     dataIni = document.getElementById('rank-data-ini').value;
     dataFim = document.getElementById('rank-data-fim').value;
@@ -853,7 +856,9 @@ window.carregarRanking = async function() {
   document.getElementById('ranking-conteudo').style.display = 'none';
   document.getElementById('ranking-hint').style.display = 'none';
 
+  console.log('RANKING: buscando', {dataIni, dataFim, lojas});
   const atend = await buscarAtendimentosPorDatas(dataIni, dataFim, lojas);
+  console.log('RANKING: atendimentos encontrados', atend.length, atend);
   renderRanking(atend);
 
   document.getElementById('ranking-loading').style.display = 'none';
