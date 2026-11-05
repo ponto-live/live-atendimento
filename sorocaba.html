@@ -28,7 +28,7 @@ const LOJA_NOME = 'LIVE! Sorocaba';
 const LOJA_TAG  = 'Sorocaba';
 const Paraiso = 'Sorocaba';
 const WPP = ['5515981236986','5511968122327'];
-const VENDEDORAS_INICIAIS = ["Ilana", "Gabriela", "Natália", "Fernanda"];
+const VENDEDORAS_INICIAIS = ["Gabriela", "Natália", "Fernanda"];
 
 // ══ ESTADO ══
 let fila = [], atendimentos = [], vReg = null, resSel = null, motSel = null, prefSolicitante = null;
@@ -63,6 +63,15 @@ async function iniciarDia() {
     const filaAtual = Object.values(snapFila.val());
     const filaReset = filaAtual.map(v => ({...v, status: 'casa'}));
     await set(filaRef, filaReset);
+  }
+
+  // Sincroniza a fila com a equipe atual (remove quem saiu, inclui quem entrou)
+  const snapSync = await get(filaRef);
+  if (snapSync.exists()) {
+    const atual = Object.values(snapSync.val());
+    const ajustada = atual.filter(v => VENDEDORAS_INICIAIS.includes(v.nome));
+    VENDEDORAS_INICIAIS.forEach(n => { if (!ajustada.some(v => v.nome === n)) ajustada.push({nome: n, status: 'casa'}); });
+    if (ajustada.length !== atual.length || ajustada.some((v,i) => v.nome !== atual[i].nome)) await set(filaRef, ajustada);
   }
 
   // Salva o dia atual como último dia
